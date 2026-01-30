@@ -1,154 +1,168 @@
+import { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
-import { motion } from "framer-motion";
+import { Menu, Flame } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { StreakDisplay } from "@/components/streak/StreakDisplay";
-import { DailyPrompt } from "@/components/journal/DailyPrompt";
-import { QuickEntry } from "@/components/journal/QuickEntry";
+import { GreetingHeader } from "@/components/chat/GreetingHeader";
+import { ChatSidebar } from "@/components/chat/ChatSidebar";
+import { ChatMessage } from "@/components/chat/ChatMessage";
+import { ChatInput } from "@/components/chat/ChatInput";
 import { useUserProfile } from "@/hooks/useProfile";
 import { useUserStreak } from "@/hooks/useStreaks";
-import { useJournalEntries } from "@/hooks/useJournal";
-
-// Sample prompts - will be AI generated later
-const dailyPrompts = [
-  "What moment today made you pause and appreciate life?",
-  "If you could give your younger self one piece of advice, what would it be?",
-  "What's something you're looking forward to?",
-  "Describe a challenge you overcame recently and what it taught you.",
-  "What are three things you're grateful for right now?",
-  "What would you do if you knew you couldn't fail?",
-  "Describe a person who has positively influenced your life.",
-];
-
-const getRandomPrompt = () => {
-  const today = new Date();
-  const index = today.getDate() % dailyPrompts.length;
-  return dailyPrompts[index];
-};
-
-const getGreeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-};
-
-const moodEmoji: Record<string, string> = {
-  amazing: "✨",
-  good: "😊",
-  okay: "😐",
-  down: "😔",
-  rough: "😢",
-};
+import {
+  useChatConversations,
+  useChatMessages,
+  useCreateConversation,
+  useAddMessage,
+  useUpdateConversationTitle,
+} from "@/hooks/useChatHistory";
 
 const HomePage = () => {
-  const currentPrompt = getRandomPrompt();
-  const today = new Date();
-  
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   const { data: profile } = useUserProfile();
   const { data: streakData } = useUserStreak();
-  const { data: entries } = useJournalEntries();
+  const { data: conversations = [] } = useChatConversations();
+  const { data: messages = [] } = useChatMessages(currentConversationId);
+  const createConversation = useCreateConversation();
+  const addMessage = useAddMessage();
+  const updateTitle = useUpdateConversationTitle();
 
-  const recentEntries = entries?.slice(0, 2) || [];
   const displayName = profile?.display_name || "Writer";
   const currentStreak = streakData?.current_streak || 0;
+  const today = new Date();
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleNewConversation = () => {
+    setCurrentConversationId(null);
+    setSidebarOpen(false);
+  };
+
+  const handleSendMessage = async (content: string) => {
+    let conversationId = currentConversationId;
+
+    // Create new conversation if none exists
+    if (!conversationId) {
+      const newConv = await createConversation.mutateAsync(undefined);
+      conversationId = newConv.id;
+      setCurrentConversationId(conversationId);
+    }
+
+    // Add user message
+    await addMessage.mutateAsync({
+      conversationId,
+      role: "user",
+      content,
+    });
+
+    // Update conversation title from first message if untitled
+    const currentConv = conversations.find(c => c.id === conversationId);
+    if (!currentConv?.title && content.length > 0) {
+      const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
+      await updateTitle.mutateAsync({ id: conversationId, title });
+    }
+
+    // Simulate AI response (placeholder for actual AI integration)
+    setIsTyping(true);
+    setTimeout(async () => {
+      const responses = [
+        "That's a beautiful thought. What else is on your mind today?",
+        "I appreciate you sharing that. How does this make you feel?",
+        "Thank you for opening up. Would you like to explore this further?",
+        "That's insightful. What led you to this realization?",
+        "I'm here to listen. Tell me more about what you're experiencing.",
+      ];
+      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+      
+      await addMessage.mutateAsync({
+        conversationId: conversationId!,
+        role: "assistant",
+        content: randomResponse,
+      });
+      setIsTyping(false);
+    }, 1500);
+  };
 
   return (
-    <PageContainer>
-      <div className="space-y-6">
+    <>
+      <ChatSidebar
+        conversations={conversations}
+        currentConversationId={currentConversationId}
+        onSelectConversation={setCurrentConversationId}
+        onNewConversation={handleNewConversation}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+
+      <PageContainer className="flex flex-col h-[calc(100vh-80px)]">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between"
-        >
-          <div>
-            <p className="text-sm text-muted-foreground">
-              {format(today, "EEEE")}
-            </p>
-            <h1 className="text-3xl font-serif text-foreground">
-              {format(today, "MMMM d")}
-            </h1>
+        <div className="flex items-center justify-between py-2">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 rounded-lg hover:bg-muted transition-colors"
+          >
+            <Menu className="h-5 w-5 text-muted-foreground" />
+          </button>
+
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-ui text-muted-foreground">
+              {format(today, "EEEE, MMM d")}
+            </span>
+            {currentStreak > 0 && (
+              <div className="flex items-center gap-1 text-primary">
+                <Flame className="h-4 w-4" />
+                <span className="text-sm font-ui font-medium">{currentStreak}</span>
+              </div>
+            )}
           </div>
-          <StreakDisplay count={currentStreak} isActive={currentStreak > 0} />
-        </motion.div>
+        </div>
 
-        {/* Greeting */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="py-4"
-        >
-          <h2 className="text-xl font-serif text-foreground">
-            {getGreeting()}, <span className="text-primary">{displayName}</span>
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Ready to reflect on your day?
-          </p>
-        </motion.div>
+        {/* Greeting (only show when no conversation selected or empty) */}
+        {(!currentConversationId || messages.length === 0) && (
+          <GreetingHeader displayName={displayName} />
+        )}
 
-        {/* Daily Prompt */}
-        <DailyPrompt prompt={currentPrompt} />
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto py-4 space-y-4 scrollbar-hide">
+          {messages.map((msg, idx) => (
+            <ChatMessage
+              key={msg.id}
+              message={msg}
+              isLatest={idx === messages.length - 1}
+            />
+          ))}
 
-        {/* Quick Entry */}
-        <QuickEntry initialPrompt={currentPrompt} />
-
-        {/* Recent Entries Preview */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="space-y-3"
-        >
-          <div className="flex items-center justify-between">
-            <h3 className="font-serif text-lg text-foreground">Recent</h3>
-            <a
-              href="/history"
-              className="text-sm text-primary hover:text-primary/80 transition-colors"
-            >
-              View all
-            </a>
-          </div>
-
-          {recentEntries.length === 0 ? (
-            <div className="glass-card p-6 text-center">
-              <p className="text-muted-foreground">
-                No entries yet. Start writing your first journal entry!
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {recentEntries.map((entry, i) => (
-                <motion.div
-                  key={entry.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.5 + i * 0.1 }}
-                  className="glass-card p-4 cursor-pointer hover:border-primary/30 transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(entry.entry_date), "MMMM d")}
-                      </p>
-                      <p className="mt-1 line-clamp-2 text-sm text-foreground/80">
-                        {entry.content.slice(0, 100)}
-                        {entry.content.length > 100 ? "..." : ""}
-                      </p>
-                    </div>
-                    {entry.mood && (
-                      <span className="text-xl ml-2">
-                        {moodEmoji[entry.mood]}
-                      </span>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
+          {isTyping && (
+            <div className="flex justify-start">
+              <div className="chat-bubble-assistant">
+                <div className="flex gap-1">
+                  <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
+              </div>
             </div>
           )}
-        </motion.div>
-      </div>
-    </PageContainer>
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input */}
+        <div className="pb-4">
+          <ChatInput
+            onSend={handleSendMessage}
+            disabled={isTyping}
+            placeholder="Share your thoughts..."
+          />
+        </div>
+      </PageContainer>
+    </>
   );
 };
 

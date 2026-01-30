@@ -46,6 +46,25 @@ export function useJournalEntries() {
   });
 }
 
+export function useJournalEntry(entryId: string | null) {
+  return useQuery({
+    queryKey: ["journal-entry", entryId],
+    queryFn: async () => {
+      if (!entryId) return null;
+      
+      const { data, error } = await supabase
+        .from("journal_entries")
+        .select("*")
+        .eq("id", entryId)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data as JournalEntry | null;
+    },
+    enabled: !!entryId,
+  });
+}
+
 export function useTodayEntry() {
   const { user } = useAuth();
   const today = new Date().toISOString().split("T")[0];
@@ -134,10 +153,34 @@ export function useUpdateEntry() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["today-entry"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entry"] });
       toast.success("Entry updated!");
     },
     onError: (error) => {
       toast.error("Failed to update entry: " + error.message);
+    },
+  });
+}
+
+export function useDeleteEntry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("journal_entries")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["today-entry"] });
+      toast.success("Entry deleted");
+    },
+    onError: (error) => {
+      toast.error("Failed to delete entry: " + error.message);
     },
   });
 }

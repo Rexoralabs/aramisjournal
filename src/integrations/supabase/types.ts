@@ -14,6 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      chat_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chat_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          role: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       journal_entries: {
         Row: {
           ai_mood_analysis: Json | null
@@ -58,29 +114,41 @@ export type Database = {
       }
       profiles: {
         Row: {
+          accent_color: string | null
           avatar_url: string | null
+          bio: string | null
           created_at: string
           display_name: string | null
+          font_size_preference: string | null
           id: string
           notification_enabled: boolean | null
+          theme_preference: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          accent_color?: string | null
           avatar_url?: string | null
+          bio?: string | null
           created_at?: string
           display_name?: string | null
+          font_size_preference?: string | null
           id?: string
           notification_enabled?: boolean | null
+          theme_preference?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          accent_color?: string | null
           avatar_url?: string | null
+          bio?: string | null
           created_at?: string
           display_name?: string | null
+          font_size_preference?: string | null
           id?: string
           notification_enabled?: boolean | null
+          theme_preference?: string | null
           updated_at?: string
           user_id?: string
         }

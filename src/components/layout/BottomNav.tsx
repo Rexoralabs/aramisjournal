@@ -1,86 +1,71 @@
 import { Link, useLocation } from "react-router-dom";
-import { MessageCircle, PenLine, TreeDeciduous, BarChart3, User } from "lucide-react";
+import { Home, PenLine, TreeDeciduous, LayoutGrid, User } from "lucide-react";
 import { useRef, useLayoutEffect } from "react";
+import { format } from "date-fns";
 import gsap from "gsap";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { path: "/", icon: MessageCircle, label: "Today" },
+  { path: "/", icon: Home, label: "Home" },
   { path: "/write", icon: PenLine, label: "Write" },
   { path: "/orchard", icon: TreeDeciduous, label: "Orchard" },
-  { path: "/insights", icon: BarChart3, label: "Insights" },
+  { path: "/insights", icon: LayoutGrid, label: "Insights" },
   { path: "/profile", icon: User, label: "Profile" },
 ];
 
 export function BottomNav() {
   const location = useLocation();
-  const indicatorRef = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLDivElement>(null);
+  const pillRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    if (!indicatorRef.current || !navRef.current) return;
-
-    const activeIndex = navItems.findIndex(item => item.path === location.pathname);
-    if (activeIndex === -1) return;
-
-    const navItems_el = navRef.current.querySelectorAll('a');
-    const activeItem = navItems_el[activeIndex];
-    
-    if (activeItem) {
-      const rect = activeItem.getBoundingClientRect();
-      const navRect = navRef.current.getBoundingClientRect();
-      const leftPos = rect.left - navRect.left + rect.width / 2 - 12;
-
-      gsap.to(indicatorRef.current, {
-        left: leftPos,
-        duration: 0.3,
-        ease: "power2.out"
-      });
+    if (pillRef.current) {
+      gsap.fromTo(
+        pillRef.current,
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.4, delay: 0.2, ease: "power2.out" }
+      );
     }
-  }, [location.pathname]);
+  }, []);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 glass-card border-t border-border/50 px-2 pb-safe">
-      <div ref={navRef} className="mx-auto flex max-w-lg items-center justify-around py-2 relative">
+    <nav ref={navRef} className="fixed bottom-4 left-0 right-0 z-50 px-4">
+      <div className="flex items-end justify-center relative">
+        {/* Floating nav pill */}
         <div
-          ref={indicatorRef}
-          className="absolute -top-1 h-1 w-6 rounded-full bg-primary transition-opacity"
-          style={{ left: '50%', transform: 'translateX(-50%)' }}
-        />
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          const Icon = item.icon;
+          ref={pillRef}
+          className="flex items-center gap-1 px-3 py-2.5 rounded-full bg-card/95 backdrop-blur-xl border border-border/50 shadow-lg"
+        >
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            const Icon = item.icon;
 
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className="relative flex flex-col items-center px-3 py-2 group"
-            >
-              <div
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
                 className={cn(
-                  "transition-transform duration-200",
-                  isActive && "scale-110"
+                  "w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200",
+                  isActive
+                    ? "bg-primary/15"
+                    : "hover:bg-muted/50"
                 )}
               >
                 <Icon
                   className={cn(
                     "h-5 w-5 transition-colors duration-200",
-                    isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                    isActive ? "text-primary" : "text-muted-foreground"
                   )}
                 />
-              </div>
-              <span
-                className={cn(
-                  "mt-1 text-xs font-ui transition-colors duration-200",
-                  isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                )}
-              >
-                {item.label}
-              </span>
-            </Link>
-          );
-        })}
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Date display in corner */}
+        <span className="absolute right-6 bottom-1 text-xs font-ui text-muted-foreground">
+          {format(new Date(), "MM.dd.yy")}
+        </span>
       </div>
     </nav>
   );

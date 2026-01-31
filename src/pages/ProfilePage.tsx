@@ -1,9 +1,10 @@
-import { useState, useRef, useLayoutEffect } from "react";
+import { useState, useRef, useLayoutEffect, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { User, LogOut, ChevronRight, Camera } from "lucide-react";
+import { LogOut, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import gsap from "gsap";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { AvatarUpload } from "@/components/profile/AvatarUpload";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile, useUpdateProfile } from "@/hooks/useProfile";
 import { useUserStreak } from "@/hooks/useStreaks";
@@ -20,9 +21,9 @@ const ProfilePage = () => {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [displayName, setDisplayName] = useState(profile?.display_name || "");
-  const [bio, setBio] = useState(profile?.bio || "");
+  const [displayName, setDisplayName] = useState("");
+  const [bio, setBio] = useState("");
+  const [hasChanges, setHasChanges] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -42,12 +43,18 @@ const ProfilePage = () => {
     }
   }, []);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (profile) {
       setDisplayName(profile.display_name || "");
       setBio(profile.bio || "");
     }
   }, [profile]);
+
+  useEffect(() => {
+    const originalName = profile?.display_name || "";
+    const originalBio = profile?.bio || "";
+    setHasChanges(displayName !== originalName || bio !== originalBio);
+  }, [displayName, bio, profile]);
 
   const handleSaveProfile = async () => {
     try {
@@ -55,7 +62,6 @@ const ProfilePage = () => {
         display_name: displayName,
         bio,
       });
-      setIsEditing(false);
       toast.success("Profile updated!");
     } catch (error) {
       toast.error("Failed to update profile");
@@ -74,6 +80,8 @@ const ProfilePage = () => {
     { value: "system", label: "System" },
   ] as const;
 
+  const bioMaxLength = 280;
+
   return (
     <PageContainer>
       <div ref={containerRef} className="space-y-6 pb-8">
@@ -82,94 +90,78 @@ const ProfilePage = () => {
 
         {/* User Info Card */}
         <div className="glass-card-glow p-5">
-          <div className="flex items-start gap-4">
-            {/* Avatar */}
-            <div className="relative">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/20">
-                {profile?.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt="Avatar"
-                    className="h-20 w-20 rounded-full object-cover"
-                  />
-                ) : (
-                  <User className="h-10 w-10 text-primary" />
-                )}
-              </div>
-              <button className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-card border border-border hover:bg-muted transition-colors">
-                <Camera className="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
-            </div>
+          <div className="flex flex-col items-center gap-4">
+            {/* Avatar - Centered with upload */}
+            <AvatarUpload currentAvatarUrl={profile?.avatar_url} size="lg" />
 
-            {/* Info */}
-            <div className="flex-1">
-              {isEditing ? (
-                <div className="space-y-3">
-                  <Input
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Display name"
-                    className="font-serif text-lg"
-                  />
-                  <Textarea
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    placeholder="Write a short bio..."
-                    rows={3}
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleSaveProfile}
-                      className="btn-luxury !px-4 !py-2 text-sm"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setIsEditing(false)}
-                      className="btn-ghost"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+            {/* Editable Info */}
+            <div className="w-full space-y-4 mt-2">
+              <div>
+                <label className="text-xs font-ui text-muted-foreground mb-1 block">
+                  Display Name
+                </label>
+                <Input
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Your name"
+                  className="font-serif text-lg text-center"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-ui text-muted-foreground mb-1 block">
+                  Email
+                </label>
+                <p className="text-sm text-muted-foreground text-center py-2">
+                  {user?.email}
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-ui text-muted-foreground">
+                    Bio
+                  </label>
+                  <span className="text-xs font-ui text-muted-foreground">
+                    {bio.length}/{bioMaxLength}
+                  </span>
                 </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between">
-                    <h2 className="font-serif text-xl text-foreground">
-                      {profile?.display_name || "Writer"}
-                    </h2>
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="text-sm font-ui text-primary hover:underline"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{user?.email}</p>
-                  {profile?.bio && (
-                    <p className="text-sm text-foreground/80 mt-2">{profile.bio}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Member since {joinedDate}
-                  </p>
-                </>
+                <Textarea
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value.slice(0, bioMaxLength))}
+                  placeholder="Write a short bio..."
+                  rows={3}
+                  className="resize-none"
+                />
+              </div>
+
+              <p className="text-xs text-muted-foreground text-center">
+                Member since {joinedDate}
+              </p>
+
+              {hasChanges && (
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={updateProfile.isPending}
+                  className="w-full btn-luxury"
+                >
+                  {updateProfile.isPending ? "Saving..." : "Save Changes"}
+                </button>
               )}
             </div>
           </div>
 
           {/* Stats */}
-          {!isEditing && (
-            <div className="mt-4 pt-4 border-t border-border/50 grid grid-cols-2 gap-4">
-              <div className="text-center">
-                <p className="text-2xl font-serif text-foreground">{totalEntries}</p>
-                <p className="text-xs font-ui text-muted-foreground">journal entries</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-serif text-primary">{currentStreak}</p>
-                <p className="text-xs font-ui text-muted-foreground">day streak</p>
-              </div>
+          <div className="mt-6 pt-4 border-t border-border/50 grid grid-cols-2 gap-4">
+            <div className="text-center">
+              <p className="text-2xl font-serif text-foreground">{totalEntries}</p>
+              <p className="text-xs font-ui text-muted-foreground">journal entries</p>
             </div>
-          )}
+            <div className="text-center">
+              <p className="text-2xl font-serif text-primary">{currentStreak}</p>
+              <p className="text-xs font-ui text-muted-foreground">day streak</p>
+            </div>
+          </div>
         </div>
 
         {/* Theme Selector */}

@@ -8,32 +8,39 @@ interface GreetingHeaderProps {
 export function GreetingHeader({ displayName }: GreetingHeaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const greetingRef = useRef<HTMLHeadingElement>(null);
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
-  };
+  const subtitleRef = useRef<HTMLParagraphElement>(null);
 
   useLayoutEffect(() => {
-    if (greetingRef.current) {
-      gsap.fromTo(
+    const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+    
+    if (greetingRef.current && subtitleRef.current) {
+      tl.fromTo(
         greetingRef.current,
         { opacity: 0, y: -20 },
-        { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }
+        { opacity: 1, y: 0, duration: 0.6 }
+      ).fromTo(
+        subtitleRef.current,
+        { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.5 },
+        "-=0.3"
       );
     }
   }, []);
 
   return (
-    <div ref={containerRef} className="text-center py-6">
+    <div ref={containerRef} className="text-center py-8 flex-1 flex flex-col items-center justify-center">
       <h1
         ref={greetingRef}
-        className="text-3xl md:text-4xl font-serif text-foreground"
+        className="text-4xl md:text-5xl font-serif text-foreground mb-3"
       >
-        {getGreeting()}, <span className="text-primary">{displayName}</span>
+        Hey, <span className="text-primary">{displayName}</span>.
       </h1>
+      <p
+        ref={subtitleRef}
+        className="text-lg md:text-xl text-muted-foreground font-sans"
+      >
+        How Was Your Day?
+      </p>
     </div>
   );
 }

@@ -1,14 +1,16 @@
 import { useState, useRef, useLayoutEffect } from "react";
 import { Send } from "lucide-react";
 import gsap from "gsap";
+import { cn } from "@/lib/utils";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  centered?: boolean;
 }
 
-export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, placeholder, centered }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -27,6 +29,10 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
     if (!message.trim() || disabled) return;
     onSend(message.trim());
     setMessage("");
+    // Reset height
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -46,8 +52,14 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
   };
 
   return (
-    <div ref={containerRef} className="glass-card p-3">
-      <div className="flex items-end gap-3">
+    <div
+      ref={containerRef}
+      className={cn(
+        "w-full",
+        centered && "max-w-xl mx-auto"
+      )}
+    >
+      <div className="flex items-end gap-3 px-5 py-3 rounded-full bg-card border border-border/50 shadow-sm hover:border-primary/30 transition-colors focus-within:border-primary/50 focus-within:shadow-md">
         <textarea
           ref={inputRef}
           value={message}
@@ -56,12 +68,12 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
           placeholder={placeholder || "What's on your mind?"}
           disabled={disabled}
           rows={1}
-          className="flex-1 resize-none bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none min-h-[24px] max-h-[120px]"
+          className="flex-1 resize-none bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none min-h-[24px] max-h-[120px] font-sans"
         />
         <button
           onClick={handleSubmit}
           disabled={!message.trim() || disabled}
-          className="p-2 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-2.5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
         >
           <Send className="h-4 w-4" />
         </button>

@@ -1,437 +1,347 @@
 
-
-# Aramis - Premium Minimalist Luxury Journaling Companion
-## Complete Redesign Plan
-
----
-
-## 1. Branding & Typography Overhaul
-
-### App Name Change
-- Rename from "Luxe Journal" to **"Aramis"**
-- Display name in **Cinzel** typeface across all branding touchpoints
-
-### Typography System
-| Role | Font | Weight/Style |
-|------|------|--------------|
-| Display/Brand | Cinzel | Regular |
-| Serif (Headings) | Instrument Serif | Normal |
-| Serif (Emphasis) | Cormorant Garamond | Light Italic |
-| Sans-Serif (Body) | Instrument Sans | Regular |
-| Grotesque (UI Labels) | Bricolage Grotesque | Various |
-
-### Font Loading Strategy
-- Add Google Fonts imports for all five typefaces
-- Create CSS utility classes for each font family
-- Update tailwind.config.ts with new font family definitions
+# Aramis Enhancement Plan
+## Avatar Upload, Real AI Chat, Home Layout Redesign, Bottom Nav Update & Full Profile Editing
 
 ---
 
-## 2. Color Palette & Theming System
+## Overview
 
-### Design Philosophy
-Modern luxury Notion-inspired components with a warm, sophisticated palette
-
-### Light Mode (Cream Base)
-| Token | Color | Usage |
-|-------|-------|-------|
-| Background | Cream (#F5F1EB) | Main surfaces |
-| Foreground | Deep Crimson (#4A1E1E) | Primary text |
-| Primary | Gold (#C9A962) | Accents, CTAs |
-| Card | Warm White (#FAF8F5) | Component backgrounds |
-| Muted | Warm Gray (#8A8178) | Secondary text |
-
-### Dark Mode (Crimson Base)
-| Token | Color | Usage |
-|-------|-------|-------|
-| Background | Deep Crimson (#1A0A0A) | Main surfaces |
-| Foreground | Cream (#F5F1EB) | Primary text |
-| Primary | Gold (#D4AF37) | Accents, CTAs |
-| Card | Dark Wine (#2A1515) | Component backgrounds |
-| Muted | Dusty Rose (#9A7A7A) | Secondary text |
-
-### Implementation
-- Update CSS variables in src/index.css with both theme variants
-- Add theme toggle using next-themes (already installed)
-- Create smooth transition animations between themes
+This plan implements six key features:
+1. **Avatar upload** with Supabase storage bucket and RLS policies
+2. **Real AI integration** using Lovable AI gateway for conversational journaling
+3. **H1 font update** to Instrument Serif (already correct, will verify)
+4. **Home layout redesign** matching the reference wireframe (centered greeting, pill input)
+5. **Bottom navigation redesign** - floating pill with circular icon buttons
+6. **Full profile editing** with all customization options
 
 ---
 
-## 3. Motion Library Migration
+## 1. Database & Storage Changes
 
-### Replace Framer Motion with GSAP
-- Install gsap package
-- Create custom React hooks for GSAP animations:
-  - `useGsapFadeIn` - Entrance animations
-  - `useGsapStagger` - List animations
-  - `useGsapScrollTrigger` - Scroll-based reveals
-  - `useGsapMorph` - Shape transitions
-- Migrate all existing framer-motion animations to GSAP equivalents
-- Add GSAP-powered page transitions
+### Create Avatars Storage Bucket
+Create a migration to set up the `avatars` storage bucket with proper RLS policies:
 
-### Animation Patterns
-- Smooth entrance animations with subtle easing
-- Micro-interactions on buttons and cards
-- Page transition effects
-- Scroll-triggered reveals for content sections
+```sql
+-- Create public avatars bucket
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true);
 
----
+-- Allow authenticated users to upload their own avatar
+CREATE POLICY "Users can upload own avatar"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'avatars' AND
+  (storage.foldername(name))[1] = auth.uid()::text
+);
 
-## 4. UI Component System (Notion-Inspired Luxury)
+-- Allow users to update their own avatar
+CREATE POLICY "Users can update own avatar"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
 
-### Design Language
-- Clean, minimal borders with subtle shadows
-- Generous spacing and breathing room
-- Soft corners (8-12px radius)
-- Subtle hover states with color shifts
-- Focus on typography hierarchy
+-- Allow users to delete their own avatar
+CREATE POLICY "Users can delete own avatar"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
 
-### Core Components to Restyle
-- Buttons (primary, secondary, ghost variants)
-- Cards (glass effect with theme-aware backgrounds)
-- Inputs (minimal, underline or soft-bordered)
-- Navigation elements
-- Modals and dialogs
-- Toast notifications
-
----
-
-## 5. Module Restructuring
-
-### Today Module - AI Chat Interface
-**Complete redesign to modern AI chat experience**
-
-```text
-+-----------------------------------------------+
-|  [Sidebar Toggle]           [Date] [Streak]   |
-+-----------------------------------------------+
-|                                               |
-|  "Good evening, Marcus"                       |
-|  (H1 - Instrument Serif, animated greeting)   |
-|                                               |
-|  +------------------------------------------+ |
-|  |  AI Message Bubble                       | |
-|  |  "What's been on your mind today?"       | |
-|  +------------------------------------------+ |
-|                                               |
-|  +------------------------------------------+ |
-|  |  User Response Bubble                    | |
-|  +------------------------------------------+ |
-|                                               |
-|  +------------------------------------------+ |
-|  |  [Message Input] [Send]                  | |
-|  +------------------------------------------+ |
-+-----------------------------------------------+
+-- Public read access for avatars
+CREATE POLICY "Public avatar access"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'avatars');
 ```
 
-**Features:**
-- Variable time-based greeting with user's name as H1
-- Date display in elegant format
-- Streak counter (compact)
-- Collapsible sidebar for chat history (only this module)
-- AI-powered conversational journaling
-- Message bubbles with subtle animations
+---
 
-### Write Module - Enhanced Editor
-**Add past entries management**
+## 2. Real AI Integration (Lovable AI Gateway)
 
-```text
-+-----------------------------------------------+
-|  [Back]  [Entries List]  [Mood] [Save]        |
-+-----------------------------------------------+
-|  Select Entry: [Dropdown/Tabs]                |
-|  - Today's Entry                              |
-|  - Jan 28, 2026 - "Reflection on..."          |
-|  - Jan 27, 2026 - "Morning thoughts"          |
-+-----------------------------------------------+
-|                                               |
-|  [Title Input]                                |
-|                                               |
-|  [Content Editor - Full height]               |
-|                                               |
-+-----------------------------------------------+
-|  [Word Count]                                 |
-+-----------------------------------------------+
+### Edge Function: `chat`
+Create `supabase/functions/chat/index.ts` with:
+- Connection to Lovable AI Gateway (google/gemini-3-flash-preview)
+- SSE streaming for real-time token-by-token responses
+- Journaling-focused system prompt
+- Error handling for rate limits (429) and payment (402)
+
+**System Prompt:**
+```
+You are Aramis, a thoughtful and empathetic AI journaling companion. 
+Your role is to:
+- Help users reflect on their thoughts and feelings
+- Ask gentle, open-ended questions to encourage deeper reflection
+- Offer supportive observations without being prescriptive
+- Celebrate their consistency and emotional growth
+- Keep responses concise but meaningful (2-3 sentences typically)
+
+Tone: Warm, sophisticated, and quietly supportive - like a wise friend.
 ```
 
-**Features:**
-- Entry selector dropdown/tabs to view past entries
-- Edit mode for historical entries
-- Delete confirmation for entries
-- Auto-save with debouncing
-
-### Milestones Module - "The Orchard"
-**Standalone immersive achievement experience**
-
-```text
-+-----------------------------------------------+
-|  Welcome to the Orchard                       |
-|  (Atmospheric entrance animation)             |
-+-----------------------------------------------+
-|                                               |
-|   [Tree/Growth Visual Metaphor]               |
-|                                               |
-|   +--------+  +--------+  +--------+          |
-|   | 7 Days |  |30 Days |  |60 Days |          |
-|   | Seed   |  |Sprout  |  |Bloom   |          |
-|   | [Glow] |  |[Locked]|  |[Locked]|          |
-|   +--------+  +--------+  +--------+          |
-|                                               |
-|   +--------+  +--------+                      |
-|   |100 Days|  |365 Days|                      |
-|   |Flourish|  |Harvest |                      |
-|   |[Locked]|  |[Locked]|                      |
-|   +--------+  +--------+                      |
-|                                               |
-|   "Your dedication bears fruit"               |
-|   Progress: 3/7 days to next milestone        |
-|                                               |
-+-----------------------------------------------+
+**Edge Function Structure:**
+```typescript
+// CORS headers for browser requests
+// Validate Authorization header (JWT from Supabase Auth)
+// Build messages array with system prompt + conversation history
+// Call Lovable AI Gateway with streaming enabled
+// Pipe SSE response back to client
 ```
 
-**Psychology-driven design:**
-- Growth metaphor (seeds to harvest)
-- Visual progress indicators
-- Celebratory unlock animations
-- Inspirational messaging
-- "Almost there" progress bars to drive engagement
+### Frontend Chat Integration
+Update `HomePage.tsx` to:
+- Call the chat edge function via fetch with SSE
+- Stream tokens progressively to create typing effect
+- Handle loading/error states
+- Show toast for rate limit errors
 
-### Insights Module - Dashboard First
-**AI-powered analytics dashboard**
+---
 
+## 3. Home Layout Redesign (Per Reference Wireframe)
+
+### Layout Structure
 ```text
-+-----------------------------------------------+
-|  Your Journey                                 |
-+-----------------------------------------------+
-|  +------------------------------------------+ |
-|  | AI Insight Card (Priority)               | |
-|  | "You've been most reflective on Sundays" | |
-|  +------------------------------------------+ |
-|                                               |
-|  +----------+  +----------+  +----------+     |
-|  | Entries  |  | Streak   |  | Avg Mood |     |
-|  |   42     |  |   12     |  |   4.2    |     |
-|  +----------+  +----------+  +----------+     |
-|                                               |
-|  +------------------------------------------+ |
-|  | Mood Trend Chart                         | |
-|  +------------------------------------------+ |
-|                                               |
-|  +------------------------------------------+ |
-|  | Weekly AI Summary                        | |
-|  +------------------------------------------+ |
-+-----------------------------------------------+
++---------------------------------------------------+
+|  [Sidebar]       Day 1             [Theme Toggle] |  <- Top bar
++---------------------------------------------------+
+|                                                   |
+|                                                   |
+|           Hey, Charis.                            |  <- Large centered greeting
+|           How Was Your Day?                       |  <- Subtitle
+|                                                   |
+|    +----------------------------------------+     |  <- Pill-shaped input
+|    |                                        |     |
+|    +----------------------------------------+     |
+|                                                   |
++---------------------------------------------------+
+|     ( Home ) ( Write ) ( Tree ) ( Grid ) ( User ) |  <- Floating nav pill
+|                                         01.30.26  |  <- Date in corner
++---------------------------------------------------+
 ```
 
-**Features:**
-- AI-generated personalized insights (top card)
-- Key metrics at a glance
-- Mood trend visualization
-- Writing pattern analysis
-- Weekly reflection summaries
+### Key Changes to HomePage.tsx
+1. **Top Header:**
+   - Sidebar toggle (hamburger) on left
+   - "Day X" streak counter in center (shows current day of streak)
+   - Theme toggle (Moon/Sun icon) on right
+   
+2. **Greeting Section (Center):**
+   - Large H1: "Hey, {Name}." (Instrument Serif)
+   - Subtitle: "How Was Your Day?" (lighter weight)
+   - Vertically centered when no messages
+   
+3. **Input:**
+   - Pill-shaped (rounded-full) with larger padding
+   - Centered below greeting
+   - Moves to bottom when messages exist
 
-### Profile Module - Full Customization
-**Complete profile management**
+### GreetingHeader.tsx Updates
+- Use "Hey, {Name}." format (shorter, warmer)
+- Add subtitle prompt: "How Was Your Day?"
+- Style with font-serif for H1
 
+### ChatInput.tsx Updates
+- Change to pill shape: `rounded-full`
+- Larger padding: `px-6 py-4`
+- Remove glass card styling in favor of softer card
+
+---
+
+## 4. Bottom Navigation Redesign
+
+### New Design
+Floating centered pill with 5 circular icon buttons:
+- No text labels (icons only)
+- Date display in bottom-right corner
+
+### Changes to BottomNav.tsx
+```tsx
+<nav className="fixed bottom-4 left-0 right-0 z-50 px-4">
+  <div className="flex items-end justify-center">
+    {/* Floating nav pill */}
+    <div className="flex items-center gap-2 px-4 py-3 rounded-full 
+                    bg-card/90 backdrop-blur-lg border border-border/30 shadow-lg">
+      {navItems.map(item => (
+        <Link className="w-11 h-11 rounded-full flex items-center justify-center
+                         hover:bg-muted/50 transition-colors">
+          <Icon className={isActive ? "text-primary" : "text-muted-foreground"} />
+        </Link>
+      ))}
+    </div>
+    
+    {/* Date in corner */}
+    <span className="absolute right-6 bottom-1 text-xs font-ui text-muted-foreground">
+      {format(new Date(), "MM.dd.yy")}
+    </span>
+  </div>
+</nav>
+```
+
+### Icon Updates
+- Home: `Home` icon
+- Write: `PenLine` icon
+- Orchard: `TreeDeciduous` icon
+- Insights: `LayoutGrid` icon
+- Profile: `User` icon
+
+---
+
+## 5. Avatar Upload Component
+
+### New File: `src/components/profile/AvatarUpload.tsx`
+- Clickable avatar with camera overlay
+- File input (accept="image/*")
+- Upload to Supabase Storage: `avatars/{userId}/{timestamp}.{ext}`
+- Get public URL and update profile
+- Loading state during upload
+- GSAP animation for preview
+
+### Hook: `src/hooks/useAvatarUpload.ts`
+```typescript
+export function useAvatarUpload() {
+  const uploadAvatar = async (file: File, userId: string) => {
+    const fileExt = file.name.split('.').pop();
+    const filePath = `${userId}/${Date.now()}.${fileExt}`;
+    
+    // Upload to storage
+    await supabase.storage.from('avatars').upload(filePath, file);
+    
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(filePath);
+    
+    return publicUrl;
+  };
+  
+  return { uploadAvatar };
+}
+```
+
+---
+
+## 6. Full Profile Editing
+
+### ProfilePage.tsx Enhancements
+All profile fields become fully editable:
+
+| Field | Control | Notes |
+|-------|---------|-------|
+| Avatar | AvatarUpload component | Click to upload |
+| Display Name | Text input | Inline edit |
+| Bio | Textarea | Character count indicator |
+| Theme | Button group | Light/Dark/System |
+| Font Size | Button group | Sm/Md/Lg |
+| Accent Color | Color swatches | Preset gold options |
+| Notifications | Toggle switch | Enable/disable |
+
+### Profile Form Layout
 ```text
 +-----------------------------------------------+
 |  Profile                                      |
 +-----------------------------------------------+
 |  +------------------------------------------+ |
-|  | [Avatar Upload]                          | |
-|  | Display Name: [Editable]                 | |
-|  | Email: user@email.com                    | |
-|  | Bio: [Editable textarea]                 | |
+|  | [Avatar - Click to upload]               | |
+|  |                                          | |
+|  | Display Name: [Editable Input]           | |
+|  | Email: user@email.com (read-only)        | |
+|  | Bio: [Multiline Textarea]     [120/280]  | |
+|  |                                          | |
 |  | Member since: January 2026               | |
 |  +------------------------------------------+ |
 |                                               |
-|  Customization                                |
+|  Stats                                        |
 |  +------------------------------------------+ |
-|  | Theme: [Light/Dark/System]               | |
-|  | Font Size: [Small/Medium/Large]          | |
-|  | Accent Color: [Color picker]             | |
+|  | [42 entries]    [12 day streak]          | |
 |  +------------------------------------------+ |
+|                                               |
+|  Appearance                                   |
+|  +------------------------------------------+ |
+|  | Theme: [Light] [Dark] [System]           | |
+|  +------------------------------------------+ |
+|                                               |
+|  [Privacy & Security] ->                      |
+|  [App Settings] ->                            |
+|                                               |
+|  [Sign Out]                                   |
 +-----------------------------------------------+
 ```
 
-### New Modules
+---
 
-#### Privacy & Security Page
-- Password change functionality
-- Session management (view active sessions)
-- Data export option
-- Account deletion option
-- Two-factor authentication toggle (future)
-- Privacy preferences
+## 7. Files to Create/Modify
 
-#### App Settings Page
-- Notification preferences
-- Daily reminder time picker
-- Default mood selection
-- Writing prompts toggle
-- Data sync settings
-- About/Version info
+### New Files
+| File | Purpose |
+|------|---------|
+| `supabase/functions/chat/index.ts` | AI chat edge function with SSE streaming |
+| `src/components/profile/AvatarUpload.tsx` | Avatar upload with preview |
+| `src/hooks/useAvatarUpload.ts` | Storage upload logic |
+
+### Modified Files
+| File | Changes |
+|------|---------|
+| `src/pages/HomePage.tsx` | Complete layout redesign per wireframe, AI integration |
+| `src/components/chat/GreetingHeader.tsx` | "Hey, {Name}." format with subtitle |
+| `src/components/chat/ChatInput.tsx` | Pill-shaped styling |
+| `src/components/layout/BottomNav.tsx` | Floating pill with circular icons, date display |
+| `src/components/layout/PageContainer.tsx` | Adjust bottom padding for new nav |
+| `src/pages/ProfilePage.tsx` | Full editing for all profile fields |
+| `src/hooks/useProfile.ts` | Add avatar URL update |
+| `supabase/config.toml` | Register chat edge function |
+
+### Database Migration
+- Create `avatars` storage bucket
+- Add RLS policies for storage
 
 ---
 
-## 6. Navigation Updates
+## 8. Implementation Order
 
-### Bottom Navigation
-Update labels and add new routes:
-- Today (AI Chat)
-- Write
-- Orchard (Milestones)
-- Insights
-- Profile
-
-### Today Module Sidebar
-- Dedicated sidebar component for chat history
-- Collapsible with smooth GSAP animation
-- Shows past conversations by date
-- Only visible in the Today/Chat module
+1. **Database Migration** - Create avatars bucket with RLS
+2. **Edge Function** - Build chat function with Lovable AI Gateway
+3. **Bottom Nav Redesign** - Update to floating pill design
+4. **Home Layout** - Redesign per wireframe with AI integration
+5. **Avatar Upload** - Component + hook + profile integration
+6. **Profile Editing** - Full field editing with all preferences
+7. **Polish** - GSAP animations and testing
 
 ---
 
-## 7. Database Schema Updates
+## Technical Notes
 
-### New Tables/Columns Needed
+### Lovable AI Gateway (No API Key Needed)
+The project has `LOVABLE_API_KEY` already configured. The edge function will use:
+- URL: `https://ai.gateway.lovable.dev/v1/chat/completions`
+- Model: `google/gemini-3-flash-preview`
+- Headers: `Authorization: Bearer ${LOVABLE_API_KEY}`
 
-**profiles table additions:**
-- `bio` (text, nullable) - User biography
-- `font_size_preference` (text, default 'medium')
-- `accent_color` (text, nullable)
-- `theme_preference` (text, default 'system')
-
-**New table: chat_conversations**
-- `id` (uuid, primary key)
-- `user_id` (uuid, references auth.users)
-- `title` (text, nullable)
-- `created_at` (timestamp)
-- `updated_at` (timestamp)
-
-**New table: chat_messages**
-- `id` (uuid, primary key)
-- `conversation_id` (uuid, references chat_conversations)
-- `role` (text - 'user' or 'assistant')
-- `content` (text)
-- `created_at` (timestamp)
-
----
-
-## 8. File Structure
-
-### New Files to Create
-```text
-src/
-  components/
-    chat/
-      ChatSidebar.tsx
-      ChatMessage.tsx
-      ChatInput.tsx
-      GreetingHeader.tsx
-    milestones/
-      OrchardView.tsx
-      MilestoneCard.tsx
-      ProgressIndicator.tsx
-    profile/
-      AvatarUpload.tsx
-      ProfileForm.tsx
-      ThemeSelector.tsx
-    settings/
-      SettingsSection.tsx
-      NotificationSettings.tsx
-  hooks/
-    useGsap.ts
-    useChatHistory.ts
-    useTheme.ts
-  pages/
-    PrivacySecurityPage.tsx
-    AppSettingsPage.tsx
-    OrchardPage.tsx (renamed from Insights milestones section)
-  lib/
-    animations.ts (GSAP utilities)
-```
-
-### Files to Modify
-- `src/index.css` - New color palette and typography
-- `tailwind.config.ts` - Font families and theme tokens
-- `src/App.tsx` - New routes, theme provider
-- `src/pages/HomePage.tsx` - Complete rewrite as chat interface
-- `src/pages/WritePage.tsx` - Add entry management
-- `src/pages/InsightsPage.tsx` - Dashboard redesign
-- `src/pages/ProfilePage.tsx` - Full customization
-- `src/pages/AuthPage.tsx` - Rebrand to Aramis
-- `src/components/layout/BottomNav.tsx` - Updated nav items
-
----
-
-## 9. Implementation Phases
-
-### Phase 1: Foundation
-1. Install GSAP and create animation utilities
-2. Update typography (add all fonts)
-3. Implement new color palette with theme switching
-4. Rebrand to "Aramis" across all touchpoints
-
-### Phase 2: Core Components
-1. Restyle UI components (buttons, cards, inputs)
-2. Update navigation with new routes
-3. Create base layout components
-
-### Phase 3: Module Development
-1. Today Module - AI Chat Interface with sidebar
-2. Write Module - Past entry management
-3. Orchard Module - Milestones experience
-4. Insights Module - Dashboard redesign
-
-### Phase 4: Settings & Profile
-1. Full profile customization
-2. Privacy & Security page
-3. App Settings page
-
-### Phase 5: Database & Backend
-1. Add new database tables and columns
-2. Create chat history hooks
-3. Implement AI conversation endpoints
-
-### Phase 6: Polish
-1. GSAP page transitions
-2. Micro-interactions
-3. Performance optimization
-4. Responsive refinements
-
----
-
-## 10. Technical Notes
-
-### GSAP Integration Pattern
+### SSE Streaming Pattern
 ```typescript
-// Example hook structure
-import { useLayoutEffect, useRef } from 'react';
-import gsap from 'gsap';
+// Edge function returns ReadableStream
+const response = await fetch(GATEWAY_URL, {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${apiKey}` },
+  body: JSON.stringify({ model, messages, stream: true })
+});
 
-export function useGsapFadeIn(delay = 0) {
-  const ref = useRef(null);
-  
-  useLayoutEffect(() => {
-    gsap.fromTo(ref.current, 
-      { opacity: 0, y: 20 },
-      { opacity: 1, y: 0, duration: 0.6, delay, ease: "power2.out" }
-    );
-  }, [delay]);
-  
-  return ref;
-}
+// Pipe stream to client
+return new Response(response.body, {
+  headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' }
+});
 ```
 
-### Theme Implementation
-- Use CSS custom properties for all theme tokens
-- Leverage next-themes for system preference detection
-- Smooth transitions between themes (0.3s)
+### Avatar Upload Security
+- Files stored in user-specific folders: `avatars/{user_id}/filename.ext`
+- RLS policy validates folder name matches auth.uid()
+- Public read access for displaying avatars
 
-### AI Chat Architecture
-- Store conversations in database
-- Use Lovable AI (google/gemini-2.5-flash) for responses
-- Stream responses for better UX
-- Context-aware prompts based on journal history
+### Theme Toggle
+Add theme toggle button to HomePage header using the existing `useTheme` hook:
+```tsx
+import { Moon, Sun } from "lucide-react";
+const { theme, setTheme } = useTheme();
 
+<button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+  {theme === 'dark' ? <Sun /> : <Moon />}
+</button>
+```

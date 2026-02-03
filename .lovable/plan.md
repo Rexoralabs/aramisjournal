@@ -1,347 +1,464 @@
 
 # Aramis Enhancement Plan
-## Avatar Upload, Real AI Chat, Home Layout Redesign, Bottom Nav Update & Full Profile Editing
+## Haptic Feedback, Sound Effects, Chat History Persistence, Dark Green Theme, Calendar Module, Home Layout Polish & Mobile Responsiveness
 
 ---
 
 ## Overview
 
-This plan implements six key features:
-1. **Avatar upload** with Supabase storage bucket and RLS policies
-2. **Real AI integration** using Lovable AI gateway for conversational journaling
-3. **H1 font update** to Instrument Serif (already correct, will verify)
-4. **Home layout redesign** matching the reference wireframe (centered greeting, pill input)
-5. **Bottom navigation redesign** - floating pill with circular icon buttons
-6. **Full profile editing** with all customization options
+This plan implements seven key enhancements:
+1. **Haptic feedback** - Premium tactile responses for mobile interactions
+2. **Sound effects** - Subtle audio cues for key actions
+3. **Conversation history persistence** - Past chats reviewable and continuable (already implemented - will verify and polish)
+4. **Dark mode redesign** - Dark green to black graphite aesthetic
+5. **Calendar module** - New page for date-based journal navigation
+6. **Home layout polish** - Exact match to wireframe reference (sidebar with search, "X of 365" counter)
+7. **Mobile responsiveness** - Optimize all modules for mobile-first experience
 
 ---
 
-## 1. Database & Storage Changes
+## 1. Haptic Feedback System
 
-### Create Avatars Storage Bucket
-Create a migration to set up the `avatars` storage bucket with proper RLS policies:
+### Implementation
+Create a reusable haptic utility using the Web Vibration API with fallback:
 
-```sql
--- Create public avatars bucket
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('avatars', 'avatars', true);
-
--- Allow authenticated users to upload their own avatar
-CREATE POLICY "Users can upload own avatar"
-ON storage.objects FOR INSERT
-TO authenticated
-WITH CHECK (
-  bucket_id = 'avatars' AND
-  (storage.foldername(name))[1] = auth.uid()::text
-);
-
--- Allow users to update their own avatar
-CREATE POLICY "Users can update own avatar"
-ON storage.objects FOR UPDATE
-TO authenticated
-USING (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
-
--- Allow users to delete their own avatar
-CREATE POLICY "Users can delete own avatar"
-ON storage.objects FOR DELETE
-TO authenticated
-USING (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
-
--- Public read access for avatars
-CREATE POLICY "Public avatar access"
-ON storage.objects FOR SELECT
-TO public
-USING (bucket_id = 'avatars');
-```
-
----
-
-## 2. Real AI Integration (Lovable AI Gateway)
-
-### Edge Function: `chat`
-Create `supabase/functions/chat/index.ts` with:
-- Connection to Lovable AI Gateway (google/gemini-3-flash-preview)
-- SSE streaming for real-time token-by-token responses
-- Journaling-focused system prompt
-- Error handling for rate limits (429) and payment (402)
-
-**System Prompt:**
-```
-You are Aramis, a thoughtful and empathetic AI journaling companion. 
-Your role is to:
-- Help users reflect on their thoughts and feelings
-- Ask gentle, open-ended questions to encourage deeper reflection
-- Offer supportive observations without being prescriptive
-- Celebrate their consistency and emotional growth
-- Keep responses concise but meaningful (2-3 sentences typically)
-
-Tone: Warm, sophisticated, and quietly supportive - like a wise friend.
-```
-
-**Edge Function Structure:**
+**New File: `src/lib/haptics.ts`**
 ```typescript
-// CORS headers for browser requests
-// Validate Authorization header (JWT from Supabase Auth)
-// Build messages array with system prompt + conversation history
-// Call Lovable AI Gateway with streaming enabled
-// Pipe SSE response back to client
+type HapticPattern = 'light' | 'medium' | 'heavy' | 'success' | 'error' | 'selection';
+
+const patterns: Record<HapticPattern, number | number[]> = {
+  light: 10,
+  medium: 25,
+  heavy: 50,
+  success: [10, 50, 30],
+  error: [50, 30, 50],
+  selection: 5,
+};
+
+export function haptic(pattern: HapticPattern = 'light') {
+  if ('vibrate' in navigator) {
+    navigator.vibrate(patterns[pattern]);
+  }
+}
 ```
 
-### Frontend Chat Integration
-Update `HomePage.tsx` to:
-- Call the chat edge function via fetch with SSE
-- Stream tokens progressively to create typing effect
-- Handle loading/error states
-- Show toast for rate limit errors
+### Integration Points
+| Action | Haptic Type |
+|--------|-------------|
+| Send message | medium |
+| Receive AI response complete | success |
+| Button tap | light |
+| Sidebar toggle | selection |
+| Delete action | error |
+| Save journal entry | success |
+| Navigation tap | selection |
+| Milestone unlock | heavy + success |
 
 ---
 
-## 3. Home Layout Redesign (Per Reference Wireframe)
+## 2. Sound Effects System
 
-### Layout Structure
+### Implementation
+Create a sound manager with preloaded audio files:
+
+**New File: `src/lib/sounds.ts`**
+```typescript
+type SoundEffect = 'send' | 'receive' | 'success' | 'click' | 'swoosh';
+
+const sounds: Record<SoundEffect, string> = {
+  send: '/sounds/send.mp3',
+  receive: '/sounds/receive.mp3',
+  success: '/sounds/success.mp3',
+  click: '/sounds/click.mp3',
+  swoosh: '/sounds/swoosh.mp3',
+};
+
+class SoundManager {
+  private audioCache: Map<string, HTMLAudioElement> = new Map();
+  private enabled = true;
+
+  preload() {
+    Object.entries(sounds).forEach(([key, src]) => {
+      const audio = new Audio(src);
+      audio.preload = 'auto';
+      audio.volume = 0.3;
+      this.audioCache.set(key, audio);
+    });
+  }
+
+  play(effect: SoundEffect) {
+    if (!this.enabled) return;
+    const audio = this.audioCache.get(effect);
+    if (audio) {
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    }
+  }
+
+  toggle(enabled: boolean) {
+    this.enabled = enabled;
+  }
+}
+
+export const soundManager = new SoundManager();
+```
+
+### Sound Files (Minimal Luxury)
+Create subtle, premium sound effects:
+- **send.mp3** - Soft whoosh (100ms)
+- **receive.mp3** - Gentle chime (150ms)
+- **success.mp3** - Warm affirmation tone (200ms)
+- **click.mp3** - Soft tap (50ms)
+- **swoosh.mp3** - Sidebar transition (150ms)
+
+**Note:** Sound files will be minimal size (.5-2KB each) using synthesized tones.
+
+---
+
+## 3. Conversation History Persistence
+
+### Current State (Already Implemented)
+The existing system has:
+- `chat_conversations` table with user_id, title, timestamps
+- `chat_messages` table with conversation_id, role, content
+- `useChatConversations()` hook for fetching history
+- `useChatMessages(conversationId)` for loading messages
+- `ChatSidebar` component displaying conversations
+
+### Enhancements Needed
+1. **Auto-load last conversation** on app open
+2. **Search functionality** in sidebar
+3. **Conversation grouping** by date (Today, Yesterday, This Week, Earlier)
+4. **Better empty state** messaging
+
+### ChatSidebar Updates
+```tsx
+// Add search input at top
+<input 
+  placeholder="Search conversations..."
+  onChange={(e) => setSearchQuery(e.target.value)}
+/>
+
+// Group conversations by date
+const grouped = groupByDate(filteredConversations);
+// Today, Yesterday, This Week, Earlier sections
+```
+
+---
+
+## 4. Dark Mode Redesign - Dark Green Graphite
+
+### Color Palette Update
+Transform the crimson-based dark mode to a sophisticated dark green graphite:
+
+**Updated Dark Mode Colors (`src/index.css`)**
+```css
+.dark {
+  /* Dark Graphite Green Base */
+  --background: 160 15% 5%;        /* Near black with green tint */
+  --foreground: 45 20% 92%;        /* Warm cream */
+
+  --card: 160 12% 9%;              /* Dark graphite */
+  --card-foreground: 45 20% 92%;
+
+  --popover: 160 12% 9%;
+  --popover-foreground: 45 20% 92%;
+
+  --primary: 43 55% 52%;           /* Keep gold accent */
+  --primary-foreground: 160 15% 5%;
+
+  --secondary: 160 10% 14%;        /* Subtle green tint */
+  --secondary-foreground: 45 20% 92%;
+
+  --muted: 160 8% 12%;             /* Muted graphite */
+  --muted-foreground: 160 5% 55%;  /* Soft gray-green */
+
+  --accent: 43 55% 48%;
+  --accent-foreground: 160 15% 5%;
+
+  --border: 160 8% 18%;            /* Subtle green border */
+  --input: 160 10% 12%;
+  --ring: 43 55% 52%;
+
+  /* Custom tokens - Dark Green Graphite */
+  --graphite: 160 15% 5%;
+  --graphite-mid: 160 12% 12%;
+  --graphite-light: 160 10% 18%;
+
+  /* Sidebar with green tint */
+  --sidebar-background: 160 12% 8%;
+  --sidebar-border: 160 8% 16%;
+}
+```
+
+### Visual Effect
+- Background: Almost black with subtle green undertones
+- Cards: Slightly lighter graphite with green tint
+- Borders: Dark with green hint visible on hover
+- Text: Warm cream (not pure white) for eye comfort
+- Accents: Gold remains the highlight color
+
+---
+
+## 5. Calendar Module
+
+### New Page: `/calendar`
+
+**Layout Design**
 ```text
 +---------------------------------------------------+
-|  [Sidebar]       Day 1             [Theme Toggle] |  <- Top bar
+|  Calendar                         [Month Picker]  |
 +---------------------------------------------------+
 |                                                   |
+|    << January 2026 >>                             |
 |                                                   |
-|           Hey, Charis.                            |  <- Large centered greeting
-|           How Was Your Day?                       |  <- Subtitle
+|  Sun  Mon  Tue  Wed  Thu  Fri  Sat                |
+|  [ ]  [ ]  [ ]  [1]  [2]  [3]  [4]                |
+|  [5]  [6]  [7*] [8]  [9]  [10] [11]               |
+|  [12] [13] [14] [15] [16] [17] [18]               |
+|  ...                                              |
 |                                                   |
-|    +----------------------------------------+     |  <- Pill-shaped input
-|    |                                        |     |
-|    +----------------------------------------+     |
+|  * = has entry (dot indicator)                    |
+|  Today highlighted with gold accent               |
 |                                                   |
 +---------------------------------------------------+
-|     ( Home ) ( Write ) ( Tree ) ( Grid ) ( User ) |  <- Floating nav pill
-|                                         01.30.26  |  <- Date in corner
+|  Selected Date Entry Preview                      |
+|  +----------------------------------------------+ |
+|  | "Morning Reflections"                        | |
+|  | "Today I felt grateful for..."               | |
+|  | Mood: Good | 234 words                       | |
+|  +----------------------------------------------+ |
 +---------------------------------------------------+
 ```
 
-### Key Changes to HomePage.tsx
-1. **Top Header:**
-   - Sidebar toggle (hamburger) on left
-   - "Day X" streak counter in center (shows current day of streak)
-   - Theme toggle (Moon/Sun icon) on right
-   
-2. **Greeting Section (Center):**
-   - Large H1: "Hey, {Name}." (Instrument Serif)
-   - Subtitle: "How Was Your Day?" (lighter weight)
-   - Vertically centered when no messages
-   
-3. **Input:**
-   - Pill-shaped (rounded-full) with larger padding
-   - Centered below greeting
-   - Moves to bottom when messages exist
+### Features
+- Month navigation with smooth transitions
+- Dot indicators on dates with journal entries
+- Today highlighted with gold circle
+- Tap date to see entry preview
+- Navigate to Write page to edit
+- Streak visualization (consecutive days with entries)
 
-### GreetingHeader.tsx Updates
-- Use "Hey, {Name}." format (shorter, warmer)
-- Add subtitle prompt: "How Was Your Day?"
-- Style with font-serif for H1
+### New Files
+| File | Purpose |
+|------|---------|
+| `src/pages/CalendarPage.tsx` | Main calendar view |
+| `src/components/calendar/MonthView.tsx` | Calendar grid component |
+| `src/components/calendar/DayCell.tsx` | Individual day cell |
+| `src/components/calendar/EntryPreview.tsx` | Selected date entry preview |
 
-### ChatInput.tsx Updates
-- Change to pill shape: `rounded-full`
-- Larger padding: `px-6 py-4`
-- Remove glass card styling in favor of softer card
+### Bottom Nav Update
+Add calendar icon to navigation:
+- Replace one icon or add as 6th option
+- Recommended: Add between Write and Orchard
 
 ---
 
-## 4. Bottom Navigation Redesign
+## 6. Home Layout - Exact Wireframe Match
 
-### New Design
-Floating centered pill with 5 circular icon buttons:
-- No text labels (icons only)
-- Date display in bottom-right corner
+### Reference Analysis
+From the wireframe image:
+1. **Header**: "43 *of* 365" format (italic "of") - day of year counter
+2. **Theme toggle**: Circular button (moon/sun) top-right
+3. **Sidebar**: Contains hamburger menu, search icon, "New Chat" with plus icon
+4. **Convos section**: Collapsible with chevron, list of past conversations
+5. **Greeting**: "Hey, {Name}." in large Instrument Serif
+6. **Subtitle**: "How Was Your Day?" lighter weight
+7. **Input**: Large pill-shaped, rounded with send button
+8. **Bottom nav**: Floating pill with 5 circular icons
 
-### Changes to BottomNav.tsx
+### Header Updates
 ```tsx
-<nav className="fixed bottom-4 left-0 right-0 z-50 px-4">
-  <div className="flex items-end justify-center">
-    {/* Floating nav pill */}
-    <div className="flex items-center gap-2 px-4 py-3 rounded-full 
-                    bg-card/90 backdrop-blur-lg border border-border/30 shadow-lg">
-      {navItems.map(item => (
-        <Link className="w-11 h-11 rounded-full flex items-center justify-center
-                         hover:bg-muted/50 transition-colors">
-          <Icon className={isActive ? "text-primary" : "text-muted-foreground"} />
-        </Link>
-      ))}
-    </div>
-    
-    {/* Date in corner */}
-    <span className="absolute right-6 bottom-1 text-xs font-ui text-muted-foreground">
-      {format(new Date(), "MM.dd.yy")}
-    </span>
-  </div>
-</nav>
+// Current: "Day 1" 
+// New: "43 of 365" (current day of year)
+const dayOfYear = Math.ceil(
+  (new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) 
+  / (1000 * 60 * 60 * 24)
+);
+
+<span className="font-serif text-lg">
+  {dayOfYear} <span className="italic text-muted-foreground">of</span> 365
+</span>
 ```
 
-### Icon Updates
-- Home: `Home` icon
-- Write: `PenLine` icon
-- Orchard: `TreeDeciduous` icon
-- Insights: `LayoutGrid` icon
-- Profile: `User` icon
+### ChatSidebar Updates
+Match wireframe exactly:
+- Hamburger icon top-left
+- Search icon top-right
+- "New Chat" with document+ icon
+- "Convos" collapsible section with chevron
+- Conversation list with dates
+
+### Input Styling
+- Larger pill (py-4 px-6)
+- Subtle shadow
+- Rounded-full
+- Gold send button
 
 ---
 
-## 5. Avatar Upload Component
+## 7. Mobile Responsiveness
 
-### New File: `src/components/profile/AvatarUpload.tsx`
-- Clickable avatar with camera overlay
-- File input (accept="image/*")
-- Upload to Supabase Storage: `avatars/{userId}/{timestamp}.{ext}`
-- Get public URL and update profile
-- Loading state during upload
-- GSAP animation for preview
+### Approach
+Mobile-first design with progressive enhancement for larger screens.
 
-### Hook: `src/hooks/useAvatarUpload.ts`
-```typescript
-export function useAvatarUpload() {
-  const uploadAvatar = async (file: File, userId: string) => {
-    const fileExt = file.name.split('.').pop();
-    const filePath = `${userId}/${Date.now()}.${fileExt}`;
-    
-    // Upload to storage
-    await supabase.storage.from('avatars').upload(filePath, file);
-    
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath);
-    
-    return publicUrl;
-  };
-  
-  return { uploadAvatar };
+### Key Responsive Patterns
+
+#### Bottom Navigation
+```css
+/* Already mobile-optimized */
+/* Add safe area insets for notched phones */
+.bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+}
+```
+
+#### Home Page
+- Full-width greeting on mobile
+- Input spans container width
+- Sidebar becomes overlay sheet on mobile
+- Touch-friendly tap targets (min 44px)
+
+#### Chat Messages
+- Bubbles max-width 85% on mobile, 70% on desktop
+- Proper padding for thumb reach
+
+#### Calendar
+- Responsive grid (larger cells on mobile for touch)
+- Month navigation with swipe gestures (optional)
+
+#### Profile Page
+- Stack sections vertically
+- Full-width cards
+- Large touch targets for toggles
+
+### Utility Classes to Add
+```css
+/* Touch-friendly sizing */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Safe area padding */
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Mobile text scaling */
+@media (max-width: 380px) {
+  .text-responsive {
+    font-size: 0.9em;
+  }
 }
 ```
 
 ---
 
-## 6. Full Profile Editing
-
-### ProfilePage.tsx Enhancements
-All profile fields become fully editable:
-
-| Field | Control | Notes |
-|-------|---------|-------|
-| Avatar | AvatarUpload component | Click to upload |
-| Display Name | Text input | Inline edit |
-| Bio | Textarea | Character count indicator |
-| Theme | Button group | Light/Dark/System |
-| Font Size | Button group | Sm/Md/Lg |
-| Accent Color | Color swatches | Preset gold options |
-| Notifications | Toggle switch | Enable/disable |
-
-### Profile Form Layout
-```text
-+-----------------------------------------------+
-|  Profile                                      |
-+-----------------------------------------------+
-|  +------------------------------------------+ |
-|  | [Avatar - Click to upload]               | |
-|  |                                          | |
-|  | Display Name: [Editable Input]           | |
-|  | Email: user@email.com (read-only)        | |
-|  | Bio: [Multiline Textarea]     [120/280]  | |
-|  |                                          | |
-|  | Member since: January 2026               | |
-|  +------------------------------------------+ |
-|                                               |
-|  Stats                                        |
-|  +------------------------------------------+ |
-|  | [42 entries]    [12 day streak]          | |
-|  +------------------------------------------+ |
-|                                               |
-|  Appearance                                   |
-|  +------------------------------------------+ |
-|  | Theme: [Light] [Dark] [System]           | |
-|  +------------------------------------------+ |
-|                                               |
-|  [Privacy & Security] ->                      |
-|  [App Settings] ->                            |
-|                                               |
-|  [Sign Out]                                   |
-+-----------------------------------------------+
-```
-
----
-
-## 7. Files to Create/Modify
+## 8. Files to Create/Modify
 
 ### New Files
 | File | Purpose |
 |------|---------|
-| `supabase/functions/chat/index.ts` | AI chat edge function with SSE streaming |
-| `src/components/profile/AvatarUpload.tsx` | Avatar upload with preview |
-| `src/hooks/useAvatarUpload.ts` | Storage upload logic |
+| `src/lib/haptics.ts` | Haptic feedback utility |
+| `src/lib/sounds.ts` | Sound effects manager |
+| `src/pages/CalendarPage.tsx` | Calendar module page |
+| `src/components/calendar/MonthView.tsx` | Calendar grid |
+| `src/components/calendar/DayCell.tsx` | Day cell component |
+| `src/components/calendar/EntryPreview.tsx` | Entry preview card |
+| `public/sounds/send.mp3` | Send sound effect |
+| `public/sounds/receive.mp3` | Receive sound effect |
+| `public/sounds/success.mp3` | Success sound |
+| `public/sounds/click.mp3` | Click sound |
 
 ### Modified Files
 | File | Changes |
 |------|---------|
-| `src/pages/HomePage.tsx` | Complete layout redesign per wireframe, AI integration |
-| `src/components/chat/GreetingHeader.tsx` | "Hey, {Name}." format with subtitle |
-| `src/components/chat/ChatInput.tsx` | Pill-shaped styling |
-| `src/components/layout/BottomNav.tsx` | Floating pill with circular icons, date display |
-| `src/components/layout/PageContainer.tsx` | Adjust bottom padding for new nav |
-| `src/pages/ProfilePage.tsx` | Full editing for all profile fields |
-| `src/hooks/useProfile.ts` | Add avatar URL update |
-| `supabase/config.toml` | Register chat edge function |
-
-### Database Migration
-- Create `avatars` storage bucket
-- Add RLS policies for storage
+| `src/index.css` | Dark green graphite theme colors |
+| `src/pages/HomePage.tsx` | Day of year counter, wireframe layout match |
+| `src/components/chat/ChatSidebar.tsx` | Search, collapsible convos, wireframe match |
+| `src/components/chat/ChatInput.tsx` | Larger pill styling |
+| `src/components/chat/GreetingHeader.tsx` | Responsive sizing |
+| `src/components/layout/BottomNav.tsx` | Add calendar icon, safe area padding |
+| `src/App.tsx` | Add CalendarPage route |
+| `tailwind.config.ts` | New graphite color tokens |
 
 ---
 
-## 8. Implementation Order
+## 9. Implementation Order
 
-1. **Database Migration** - Create avatars bucket with RLS
-2. **Edge Function** - Build chat function with Lovable AI Gateway
-3. **Bottom Nav Redesign** - Update to floating pill design
-4. **Home Layout** - Redesign per wireframe with AI integration
-5. **Avatar Upload** - Component + hook + profile integration
-6. **Profile Editing** - Full field editing with all preferences
-7. **Polish** - GSAP animations and testing
+### Phase 1: Theme & Responsiveness
+1. Update dark mode to graphite green palette
+2. Add responsive utility classes
+3. Test on mobile viewports
+
+### Phase 2: Home Layout Polish
+1. Update header to "X of 365" format
+2. Redesign ChatSidebar per wireframe
+3. Polish ChatInput styling
+4. Verify conversation persistence works
+
+### Phase 3: Haptics & Sound
+1. Create haptics utility
+2. Create sound manager
+3. Add sound files
+4. Integrate at key interaction points
+
+### Phase 4: Calendar Module
+1. Create CalendarPage with MonthView
+2. Query journal entries by date
+3. Add entry preview component
+4. Integrate with navigation
+
+### Phase 5: Polish
+1. GSAP animations for calendar
+2. Mobile gesture support
+3. Sound/haptic preference toggle in settings
+4. Cross-browser testing
 
 ---
 
-## Technical Notes
+## Technical Details
 
-### Lovable AI Gateway (No API Key Needed)
-The project has `LOVABLE_API_KEY` already configured. The edge function will use:
-- URL: `https://ai.gateway.lovable.dev/v1/chat/completions`
-- Model: `google/gemini-3-flash-preview`
-- Headers: `Authorization: Bearer ${LOVABLE_API_KEY}`
+### Haptic API Browser Support
+- Chrome Android: Full support
+- Safari iOS: Partial (uses Taptic Engine when available)
+- Desktop: No-op fallback (silent fail)
 
-### SSE Streaming Pattern
+### Sound Synthesis Alternative
+If hosting sound files is an issue, use Web Audio API:
 ```typescript
-// Edge function returns ReadableStream
-const response = await fetch(GATEWAY_URL, {
-  method: 'POST',
-  headers: { 'Authorization': `Bearer ${apiKey}` },
-  body: JSON.stringify({ model, messages, stream: true })
-});
+const audioContext = new AudioContext();
+const oscillator = audioContext.createOscillator();
+// Generate tones programmatically
+```
 
-// Pipe stream to client
-return new Response(response.body, {
-  headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' }
+### Calendar Date Calculations
+```typescript
+import { startOfMonth, endOfMonth, eachDayOfInterval, 
+         isSameMonth, isToday, format } from 'date-fns';
+
+const daysInMonth = eachDayOfInterval({
+  start: startOfMonth(currentDate),
+  end: endOfMonth(currentDate)
 });
 ```
 
-### Avatar Upload Security
-- Files stored in user-specific folders: `avatars/{user_id}/filename.ext`
-- RLS policy validates folder name matches auth.uid()
-- Public read access for displaying avatars
+### Mobile Touch Optimization
+- Use `touch-action: manipulation` for faster taps
+- Avoid hover-dependent interactions
+- Ensure 44px minimum touch targets
+- Add `user-select: none` where appropriate
 
-### Theme Toggle
-Add theme toggle button to HomePage header using the existing `useTheme` hook:
-```tsx
-import { Moon, Sun } from "lucide-react";
-const { theme, setTheme } = useTheme();
+---
 
-<button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-  {theme === 'dark' ? <Sun /> : <Moon />}
-</button>
-```
+## Summary
+
+This enhancement plan delivers a premium mobile experience with:
+- Tactile haptic feedback for key interactions
+- Subtle sound effects for audio cues
+- Dark graphite green aesthetic for sophisticated dark mode
+- Full calendar module for date-based navigation
+- Pixel-perfect home layout matching wireframe
+- Mobile-first responsive design throughout
+
+The implementation follows existing patterns and uses the established GSAP animation library for smooth transitions.

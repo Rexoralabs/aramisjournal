@@ -59,7 +59,7 @@ export function ChatInput({ onSend, disabled, placeholder, centered }: ChatInput
         centered && "max-w-xl mx-auto"
       )}
     >
-      <div className="flex items-end gap-3 px-5 py-3 rounded-full bg-card border border-border/50 shadow-sm hover:border-primary/30 transition-colors focus-within:border-primary/50 focus-within:shadow-md">
+      <div className="flex items-end gap-3 px-5 sm:px-6 py-3 sm:py-4 rounded-full bg-card border border-border/50 shadow-md hover:border-primary/30 transition-colors focus-within:border-primary/50 focus-within:shadow-lg">
         <textarea
           ref={inputRef}
           value={message}
@@ -68,14 +68,14 @@ export function ChatInput({ onSend, disabled, placeholder, centered }: ChatInput
           placeholder={placeholder || "What's on your mind?"}
           disabled={disabled}
           rows={1}
-          className="flex-1 resize-none bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none min-h-[24px] max-h-[120px] font-sans"
+          className="flex-1 resize-none bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none min-h-[24px] max-h-[120px] font-sans text-base"
         />
         <button
           onClick={handleSubmit}
           disabled={!message.trim() || disabled}
-          className="p-2.5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
+          className="p-2.5 sm:p-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 touch-target"
         >
-          <Send className="h-4 w-4" />
+          <Send className="h-4 w-4 sm:h-5 sm:w-5" />
         </button>
       </div>
     </div>

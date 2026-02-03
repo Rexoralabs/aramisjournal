@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Menu, Moon, Sun } from "lucide-react";
+import { getDayOfYear } from "date-fns";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { GreetingHeader } from "@/components/chat/GreetingHeader";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
@@ -9,6 +10,8 @@ import { useUserProfile } from "@/hooks/useProfile";
 import { useUserStreak } from "@/hooks/useStreaks";
 import { useTheme } from "@/hooks/useTheme";
 import { useStreamChat } from "@/hooks/useStreamChat";
+import { haptic } from "@/lib/haptics";
+import { soundManager } from "@/lib/sounds";
 import {
   useChatConversations,
   useChatMessages,
@@ -35,7 +38,7 @@ const HomePage = () => {
   const updateTitle = useUpdateConversationTitle();
 
   const displayName = profile?.display_name || "Writer";
-  const currentStreak = streakData?.current_streak || 0;
+  const dayOfYear = getDayOfYear(new Date());
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -49,6 +52,9 @@ const HomePage = () => {
 
   const handleSendMessage = async (content: string) => {
     let conversationId = currentConversationId;
+    
+    haptic('medium');
+    soundManager.play('send');
 
     // Create new conversation if none exists
     if (!conversationId) {
@@ -92,6 +98,9 @@ const HomePage = () => {
         setIsTyping(false);
         setStreamingContent("");
         
+        haptic('success');
+        soundManager.play('receive');
+        
         if (fullResponse && conversationId) {
           await addMessage.mutateAsync({
             conversationId,
@@ -124,21 +133,28 @@ const HomePage = () => {
         {/* Header */}
         <div className="flex items-center justify-between py-3">
           <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
+            onClick={() => {
+              haptic('selection');
+              soundManager.play('swoosh');
+              setSidebarOpen(true);
+            }}
+            className="p-2 rounded-lg hover:bg-muted transition-colors touch-target"
           >
             <Menu className="h-5 w-5 text-muted-foreground" />
           </button>
 
           <div className="text-center">
-            <span className="text-sm font-ui text-muted-foreground">
-              Day <span className="text-primary font-medium">{currentStreak || 1}</span>
+            <span className="text-base sm:text-lg font-serif text-foreground">
+              {dayOfYear} <span className="italic text-muted-foreground">of</span> 365
             </span>
           </div>
 
           <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
+            onClick={() => {
+              haptic('selection');
+              setTheme(theme === "dark" ? "light" : "dark");
+            }}
+            className="p-2 rounded-lg hover:bg-muted transition-colors touch-target"
           >
             {theme === "dark" ? (
               <Sun className="h-5 w-5 text-muted-foreground" />

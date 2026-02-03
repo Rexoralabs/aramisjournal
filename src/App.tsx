@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { BottomNav } from "@/components/layout/BottomNav";
 import HomePage from "./pages/HomePage";
 import WritePage from "./pages/WritePage";
+import CalendarPage from "./pages/CalendarPage";
 import OrchardPage from "./pages/OrchardPage";
 import InsightsPage from "./pages/InsightsPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -72,6 +73,7 @@ function AppRoutes() {
               <Routes>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/write" element={<WritePage />} />
+                <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/orchard" element={<OrchardPage />} />
                 <Route path="/insights" element={<InsightsPage />} />
                 <Route path="/profile" element={<ProfilePage />} />

@@ -70,61 +70,62 @@
   }
 
   .dark {
-    /* Dark Mode (Crimson Base) */
-    --background: 0 50% 4%;
-    --foreground: 36 33% 94%;
+    /* Dark Mode (Graphite Green) */
+    --background: 160 15% 5%;
+    --foreground: 45 20% 92%;
 
-    --card: 0 40% 8%;
-    --card-foreground: 36 33% 94%;
+    --card: 160 12% 9%;
+    --card-foreground: 45 20% 92%;
 
-    --popover: 0 40% 8%;
-    --popover-foreground: 36 33% 94%;
+    --popover: 160 12% 9%;
+    --popover-foreground: 45 20% 92%;
 
     --primary: 43 55% 52%;
-    --primary-foreground: 0 50% 4%;
+    --primary-foreground: 160 15% 5%;
 
-    --secondary: 0 30% 15%;
-    --secondary-foreground: 36 33% 94%;
+    --secondary: 160 10% 14%;
+    --secondary-foreground: 45 20% 92%;
 
-    --muted: 0 20% 12%;
-    --muted-foreground: 0 20% 55%;
+    --muted: 160 8% 12%;
+    --muted-foreground: 160 5% 55%;
 
     --accent: 43 55% 48%;
-    --accent-foreground: 0 50% 4%;
+    --accent-foreground: 160 15% 5%;
 
     --destructive: 0 62% 50%;
-    --destructive-foreground: 36 33% 94%;
+    --destructive-foreground: 45 20% 92%;
 
-    --border: 0 25% 18%;
-    --input: 0 30% 12%;
+    --border: 160 8% 18%;
+    --input: 160 10% 12%;
     --ring: 43 55% 52%;
 
-    /* Custom luxury tokens - Dark */
+    /* Custom luxury tokens - Dark Graphite Green */
     --gold: 43 55% 52%;
     --gold-muted: 43 40% 42%;
-    --cream: 36 33% 94%;
-    --cream-light: 40 33% 97%;
-    --crimson: 0 50% 4%;
-    --crimson-deep: 0 60% 2%;
-    --warm-gray: 0 20% 55%;
+    --cream: 45 20% 92%;
+    --cream-light: 45 25% 95%;
+    --graphite: 160 15% 5%;
+    --graphite-mid: 160 12% 12%;
+    --graphite-light: 160 10% 18%;
+    --warm-gray: 160 5% 55%;
 
-    /* Glassmorphism - Dark */
-    --glass-bg: 0 40% 8% / 0.8;
-    --glass-border: 36 33% 94% / 0.08;
+    /* Glassmorphism - Dark Graphite */
+    --glass-bg: 160 12% 9% / 0.85;
+    --glass-border: 45 20% 92% / 0.08;
     --glass-glow: 43 55% 52% / 0.15;
 
     /* Shadows - Dark */
     --shadow-gold: 0 4px 30px hsl(43, 55%, 52%, 0.2);
-    --shadow-soft: 0 8px 32px hsl(0, 0%, 0%, 0.4);
-    --shadow-card: 0 4px 16px hsl(0, 0%, 0%, 0.3);
+    --shadow-soft: 0 8px 32px hsl(160, 15%, 0%, 0.5);
+    --shadow-card: 0 4px 16px hsl(160, 15%, 0%, 0.4);
 
-    --sidebar-background: 0 40% 8%;
-    --sidebar-foreground: 36 33% 94%;
+    --sidebar-background: 160 12% 8%;
+    --sidebar-foreground: 45 20% 92%;
     --sidebar-primary: 43 55% 52%;
-    --sidebar-primary-foreground: 0 50% 4%;
-    --sidebar-accent: 0 30% 15%;
-    --sidebar-accent-foreground: 36 33% 94%;
-    --sidebar-border: 0 25% 18%;
+    --sidebar-primary-foreground: 160 15% 5%;
+    --sidebar-accent: 160 10% 14%;
+    --sidebar-accent-foreground: 45 20% 92%;
+    --sidebar-border: 160 8% 16%;
     --sidebar-ring: 43 55% 52%;
   }
 }
@@ -310,9 +311,27 @@
     font-family: 'Instrument Sans', sans-serif;
   }
 
-  /* Safe area for mobile */
+  /* Safe area insets for notched phones */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+  }
+
+  .pl-safe {
+    padding-left: env(safe-area-inset-left, 0);
+  }
+
+  .pr-safe {
+    padding-right: env(safe-area-inset-right, 0);
+  }
+
+  /* Touch-friendly sizing */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
   }
 
   /* Scroll hide utility */
@@ -323,5 +342,12 @@
 
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  /* Mobile text scaling */
+  @media (max-width: 380px) {
+    .text-responsive {
+      font-size: 0.9em;
+    }
   }
 }

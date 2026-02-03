@@ -28,16 +28,16 @@ export function GreetingHeader({ displayName }: GreetingHeaderProps) {
   }, []);
 
   return (
-    <div ref={containerRef} className="text-center py-8 flex-1 flex flex-col items-center justify-center">
+    <div ref={containerRef} className="text-center py-6 sm:py-8 flex-1 flex flex-col items-center justify-center px-4">
       <h1
         ref={greetingRef}
-        className="text-4xl md:text-5xl font-serif text-foreground mb-3"
+        className="text-3xl sm:text-4xl md:text-5xl font-serif text-foreground mb-2 sm:mb-3"
       >
         Hey, <span className="text-primary">{displayName}</span>.
       </h1>
       <p
         ref={subtitleRef}
-        className="text-lg md:text-xl text-muted-foreground font-sans"
+        className="text-base sm:text-lg md:text-xl text-muted-foreground font-sans"
       >
         How Was Your Day?
       </p>

@@ -7,6 +7,7 @@ import { useUserProfile, useUpdateProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
 import { haptic, setHapticsEnabled, isHapticsEnabled } from "@/lib/haptics";
 import { soundManager } from "@/lib/sounds";
+import { requestNotificationPermission, scheduleDailyReminder, stopDailyReminder } from "@/lib/notifications";
 
 const fontSizeOptions = [
   { value: "small", label: "Small" },
@@ -49,11 +50,24 @@ const AppSettingsPage = () => {
 
   const handleNotificationToggle = async () => {
     const newValue = !notifications;
-    setNotifications(newValue);
     haptic('selection');
+    
+    if (newValue) {
+      const granted = await requestNotificationPermission();
+      if (!granted) {
+        toast.error("Notification permission denied. Please enable in browser settings.");
+        return;
+      }
+      scheduleDailyReminder(21);
+      toast.success("Daily reminders enabled at 9 PM");
+    } else {
+      stopDailyReminder();
+      toast.success("Notifications disabled");
+    }
+    
+    setNotifications(newValue);
     try {
       await updateProfile.mutateAsync({ notification_enabled: newValue });
-      toast.success(`Notifications ${newValue ? "enabled" : "disabled"}`);
     } catch (error) {
       setNotifications(!newValue);
     }

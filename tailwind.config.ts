@@ -66,9 +66,9 @@ export default {
         "crimson-deep": "hsl(var(--crimson-deep))",
         "warm-gray": "hsl(var(--warm-gray))",
         // Dark mode graphite tokens
-        graphite: "hsl(var(--graphite))",
-        "graphite-mid": "hsl(var(--graphite-mid))",
-        "graphite-light": "hsl(var(--graphite-light))",
+        graphite: "hsl(var(--graphite, 200 5% 7%))",
+        "graphite-mid": "hsl(var(--graphite-mid, 200 4% 14%))",
+        "graphite-light": "hsl(var(--graphite-light, 200 4% 20%))",
       },
       fontFamily: {
         brand: ["Cinzel", "serif"],

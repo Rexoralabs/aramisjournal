@@ -10,6 +10,7 @@ import WritePage from "./pages/WritePage";
 import CalendarPage from "./pages/CalendarPage";
 import OrchardPage from "./pages/OrchardPage";
 import InsightsPage from "./pages/InsightsPage";
+import CellarPage from "./pages/CellarPage";
 import ProfilePage from "./pages/ProfilePage";
 import PrivacySecurityPage from "./pages/PrivacySecurityPage";
 import AppSettingsPage from "./pages/AppSettingsPage";
@@ -76,6 +77,7 @@ function AppRoutes() {
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/orchard" element={<OrchardPage />} />
                 <Route path="/insights" element={<InsightsPage />} />
+                <Route path="/cellar" element={<CellarPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/privacy" element={<PrivacySecurityPage />} />
                 <Route path="/settings" element={<AppSettingsPage />} />

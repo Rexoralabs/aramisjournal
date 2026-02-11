@@ -1,529 +1,275 @@
 
-# Aramis Major Enhancement Plan
-## PWA, Cellar Module, Orchard Revamp, Insights Redesign, UI Polish & Notifications
+
+# Aramis Refinement Plan
+## Page Transitions, Loading Screen, Cellar Fix, Desktop Responsiveness, Iconify Icons & Nav Polish
 
 ---
 
 ## Overview
 
-This plan covers 10 major enhancements:
+This plan addresses 8 specific refinements:
 
-1. **PWA Setup** - Installable web app with service worker, manifest, and icons
-2. **Bottom Nav Tooltips** - Subtle module name tooltips on icon hover
-3. **Cellar Module** - New "thought storage" module with masonry grid, top nav, and AI sidebar
-4. **Push Notifications** - Real daily reminder notifications using the Push API
-5. **Sound Effects Verification** - Ensure synthesized sounds work properly
-6. **Insights Revamp** - Modern dashboard layout inspired by the reference image arrangement
-7. **Orchard Revamp** - Apple-style editorial with GSAP parallax scrolling, many more "fruits"
-8. **Squircle Component Consistency** - All cards/buttons use rounded-2xl (squircle) styling
-9. **Hover Effects** - Subtle GSAP/CSS hover animations on interactive components
-10. **Theme Tuning** - Light mode closer to white, dark mode to pure dark graphite
-
+1. **GSAP blurred page transitions** (0.5s blur fade between routes)
+2. **Minimalist loading/splash screen** with Aramis logo on first load
+3. **Cellar nav stays at bottom** (revert top nav behavior)
+4. **Cellar populates from journal entries** (Write module data feeds into Cellar)
+5. **Desktop responsiveness** with proper breakpoints (not everything centered in a narrow column)
+6. **Iconify icons** for premium icon quality
+7. **Notifications verification** and sound effects verification
+8. **Tooltip and micro-interaction polish**
+9. **All Motion Must Use GSAP Motion Libraries**
 ---
 
-## 1. PWA Setup
+## 1. GSAP Blurred Page Transitions
 
-### Install and Configure `vite-plugin-pwa`
+### Current State
+`PageContainer` uses Framer Motion with a simple opacity+y fade. No blur effect.
 
-Add `vite-plugin-pwa` dependency and configure in `vite.config.ts`:
+### Changes
 
-```typescript
-import { VitePWA } from 'vite-plugin-pwa';
-
-plugins: [
-  react(),
-  VitePWA({
-    registerType: 'autoUpdate',
-    includeAssets: ['favicon.ico', 'robots.txt'],
-    manifest: {
-      name: 'Aramis - Mindful Journaling',
-      short_name: 'Aramis',
-      description: 'Your premium AI journaling companion',
-      theme_color: '#F5F1EB',
-      background_color: '#F5F1EB',
-      display: 'standalone',
-      start_url: '/',
-      icons: [
-        { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-        { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-        { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-      ],
-    },
-    workbox: {
-      globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-    },
-  }),
-]
-```
-
-### PWA Icons
-Generate simple SVG-based icons at 192x192 and 512x512 in `public/icons/`.
-
-### Update `index.html`
-Add:
-- `<link rel="manifest" href="/manifest.webmanifest">`
-- `<meta name="apple-mobile-web-app-capable" content="yes">`
-- `<meta name="apple-mobile-web-app-status-bar-style" content="default">`
-- Apple touch icon link
-
-### Install Page
-Create `src/pages/InstallPage.tsx` with install prompt trigger for mobile/desktop browsers.
-
----
-
-## 2. Bottom Nav Tooltips
-
-Update `src/components/layout/BottomNav.tsx`:
-- Wrap each nav icon in a Radix `Tooltip` (already available via `@radix-ui/react-tooltip`)
-- Show module name on hover with a subtle fade-in animation
-- Use `delayDuration={300}` for a natural feel
-- Tooltip styled with the existing design system
+**`src/components/layout/PageContainer.tsx`**
+Replace Framer Motion with GSAP for a 0.5s blurred transition:
 
 ```tsx
-<Tooltip>
-  <TooltipTrigger asChild>
-    <Link to={item.path} className="w-11 h-11 rounded-full ...">
-      <item.icon />
-    </Link>
-  </TooltipTrigger>
-  <TooltipContent side="top" className="font-ui text-xs">
-    {item.label}
-  </TooltipContent>
-</Tooltip>
-```
+export function PageContainer({ children, className }: PageContainerProps) {
+  const ref = useRef<HTMLDivElement>(null);
 
----
+  useLayoutEffect(() => {
+    if (!ref.current) return;
+    gsap.fromTo(ref.current,
+      { opacity: 0, filter: "blur(8px)" },
+      { opacity: 1, filter: "blur(0px)", duration: 0.5, ease: "power2.out" }
+    );
+  }, []);
 
-## 3. Cellar Module (Thought Storage)
-
-### Concept
-A "cellar" for storing loose thoughts -- quick notes, ideas, fragments. Different from the structured journal.
-
-### Database
-Create a `cellar_thoughts` table:
-```sql
-CREATE TABLE public.cellar_thoughts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  content TEXT NOT NULL,
-  color TEXT DEFAULT 'default',
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.cellar_thoughts ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can manage own thoughts"
-ON public.cellar_thoughts FOR ALL
-TO authenticated
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
-```
-
-### New Files
-| File | Purpose |
-|------|---------|
-| `src/pages/CellarPage.tsx` | Main cellar page with masonry grid, top nav, AI sidebar |
-| `src/components/cellar/ThoughtCard.tsx` | Individual thought card (squircle) |
-| `src/components/cellar/AddThoughtDialog.tsx` | Dialog/modal to add a new thought |
-| `src/components/cellar/CellarAISidebar.tsx` | Floating right sidebar with AI chat |
-| `src/hooks/useCellar.ts` | CRUD hooks for cellar_thoughts table |
-
-### Masonry Grid
-Use CSS columns for a true masonry layout (no library needed):
-```css
-.masonry-grid {
-  column-count: 2;
-  column-gap: 1rem;
-}
-.masonry-grid > * {
-  break-inside: avoid;
-  margin-bottom: 1rem;
+  return (
+    <main ref={ref} className={cn("min-h-screen pb-20 pt-6", className)} style={{ opacity: 0 }}>
+      <div className="container mx-auto max-w-lg px-4 md:max-w-2xl lg:max-w-4xl xl:max-w-6xl">
+        {children}
+      </div>
+    </main>
+  );
 }
 ```
 
-### Cellar Page Layout
-```text
-+---------------------------------------------------+
-| [Home] [Write] [Calendar] [Orchard] [Cellar] ...  |  <- TOP nav (not bottom)
-+---------------------------------------------------+
-|  The Cellar                              [AI btn] |
-+---------------------------------------------------+
-|  +------------------+ +------------------+        |
-|  | Thought 1        | | Thought 2        |        |
-|  | (variable height)| |                  |        |
-|  +------------------+ +------------------+        |
-|  +------------------+ +------------------+        |
-|  | Thought 3        | | Thought 4        |        |
-|  |                  | | (shorter)        |        |
-|  |                  | +------------------+        |
-|  +------------------+                             |
-+---------------------------------------------------+
-|  [+ Add Thought] FAB                              |
-+---------------------------------------------------+
-```
-
-### Navigation Override
-- On the Cellar page only, the bottom nav moves to the **top** of the page
-- All other pages keep the bottom nav as-is
-- Implement via a `useLocation()` check in `BottomNav` or a layout prop
-
-### AI Sidebar
-- Button in top-right with sparkle/brain icon
-- On press, a right sidebar fades in (GSAP `fromTo` with `x: 300` to `x: 0`)
-- Contains a chat interface similar to the Home page chat
-- System prompt focused on brainstorming with the user's thoughts:
-  ```
-  You are Aramis, helping the user explore their stored thoughts. 
-  You have access to their thoughts and can ask questions, find connections, 
-  and brainstorm ideas based on what they've written.
-  ```
-- Pass all cellar thoughts as context in the system prompt
-- Uses the same `chat` edge function with modified system prompt
+This removes the Framer Motion dependency from page containers while adding the luxury blur-in effect.
 
 ---
 
-## 4. Push Notifications (Daily Reminders)
+## 2. Minimalist Splash/Loading Screen
 
 ### Implementation
-Use the **Push API** and **Notification API** for browser-based push notifications.
+Add a splash screen component that shows on first app load with a blurred fade-out.
 
-**Service Worker Registration** (handled by vite-plugin-pwa):
-- The PWA service worker handles showing notifications
+**New File: `src/components/layout/SplashScreen.tsx`**
+- Full-screen overlay with `bg-background`
+- Centered "Aramis" in `font-brand` (Cinzel), ultra-minimalist
+- On mount, wait 1.5s then GSAP animate out with blur + opacity
+- Uses a state flag in `App.tsx` to show/hide
 
-**Notification Scheduling** (client-side approach):
-Since we don't have a push server, use a hybrid approach:
-1. Request notification permission on settings toggle
-2. Use `setInterval` + `localStorage` to check if reminder time has passed today
-3. When app is open and time matches, show a notification
-4. For background notifications, register a periodic sync (Chrome only) or use the service worker `periodicsync` event
-
-**New File: `src/lib/notifications.ts`**
-```typescript
-export async function requestNotificationPermission(): Promise<boolean> {
-  if (!('Notification' in window)) return false;
-  const permission = await Notification.requestPermission();
-  return permission === 'granted';
-}
-
-export function showNotification(title: string, body: string) {
-  if (Notification.permission === 'granted') {
-    new Notification(title, {
-      body,
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
-    });
-  }
-}
-
-export function scheduleDailyReminder() {
-  // Check every minute if it's reminder time
-  const checkInterval = setInterval(() => {
-    const now = new Date();
-    const lastReminder = localStorage.getItem('lastReminderDate');
-    const today = now.toDateString();
-    
-    if (lastReminder !== today && now.getHours() === 21) { // 9 PM
-      showNotification('Aramis', 'Time to reflect on your day. Your journal awaits.');
-      localStorage.setItem('lastReminderDate', today);
-    }
-  }, 60000);
-  
-  return () => clearInterval(checkInterval);
-}
-```
+**`src/App.tsx` Changes:**
+- Add `showSplash` state (default `true`)
+- Render `SplashScreen` over everything
+- After splash animates out, set `showSplash = false`
 
 ---
 
-## 5. Sound Effects
+## 3. Cellar Nav Stays at Bottom
 
-The current `SoundManager` uses Web Audio API with synthesized tones -- already functional. Will verify it works by:
-- Ensuring `AudioContext` is resumed on first user interaction
-- Adding a user gesture handler to unlock audio on mobile Safari
-- Testing all 5 sound effects (send, receive, success, click, swoosh)
+### Current State
+`BottomNav.tsx` has special logic: `isCellar ? "top-0 pt-safe pt-2" : "bottom-4 pb-safe"`.
 
----
-
-## 6. Insights Revamp
-
-### Layout Inspiration (from reference image)
-The reference shows a dashboard with:
-- Large title at top-left
-- Filter/date chips in a horizontal row
-- 3 stat cards in a row (one larger/featured, two smaller)
-- Two side-by-side content sections below (chart + data grid)
-- A bottom section with list data
-
-### New Insights Layout
-```text
-+---------------------------------------------------+
-|  Your Journey                                     |
-|  Insights from your reflection                    |
-+---------------------------------------------------+
-|  [This Week v]  [This Month]  [All Time]          |  <- Filter chips
-+---------------------------------------------------+
-|  +----------------------------------+  +--------+ |
-|  |  Current Streak                  |  | Total  | |
-|  |  12 days                         |  | 42     | |
-|  |  Your best: 30 days              |  | entries | |
-|  +----------------------------------+  +--------+ |
-|                                        +--------+ |
-|                                        | Avg    | |
-|                                        | 4.2    | |
-|                                        | mood   | |
-|                                        +--------+ |
-+---------------------------------------------------+
-|  +------------------+ +------------------+        |
-|  | Mood Over Time   | | Writing Habits   |        |
-|  | (mini chart)     | | (day heatmap)    |        |
-|  +------------------+ +------------------+        |
-+---------------------------------------------------+
-|  Monthly Progress                      Monthly    |
-|  +----------------------------------------------+ |
-|  | 18 / 28 days this month (64%)                | |
-|  | [progress bar]                                | |
-|  +----------------------------------------------+ |
-+---------------------------------------------------+
-```
-
-### Key Design Principles
-- No AI-generic copy -- use clean, data-driven labels
-- Quiet, premium typography (font-serif for numbers, font-ui for labels)
-- Squircle cards with subtle shadows
-- Filter chips to toggle time ranges
-- Side-by-side card arrangement (not stacked list)
+### Changes
+**`src/components/layout/BottomNav.tsx`**
+- Remove the `isCellar` conditional logic entirely
+- Nav always stays at the bottom on all pages
+- Remove the top-nav GSAP animation variant
+- Keep tooltips and all existing hover effects
 
 ---
 
-## 7. Orchard Revamp - Apple Editorial + GSAP Parallax
+## 4. Cellar Shows Journal Entries (Not Separate Thoughts)
 
-### Vision
-Transform from a simple milestone grid into a full-page scrolling editorial experience, like Apple product pages.
+### Current Behavior
+The Cellar has its own `cellar_thoughts` table with separate CRUD. The user wants journal entries from the Write module to populate the Cellar instead.
 
-### Structure
-Full-page sections that scroll with parallax:
+### Changes
 
-```text
-Section 1: Hero
-+---------------------------------------------------+
-|                                                   |
-|           The Orchard                             |
-|     Where dedication bears fruit                  |
-|                                                   |
-|        [Current Streak: 12 days]                  |
-|        [Progress bar to next fruit]               |
-|                                                   |
-+---------------------------------------------------+
+**`src/pages/CellarPage.tsx`**
+- Import `useJournalEntries` from `@/hooks/useJournal` instead of `useCellarThoughts`
+- Map journal entries into the masonry grid (each entry becomes a "thought card")
+- Show entry title, a content preview (first ~100 chars), mood emoji, and date
+- Remove the `AddThoughtDialog` FAB (entries are created in the Write module)
+- Keep the AI sidebar -- pass journal entries as context instead of cellar thoughts
 
-Section 2: Your Garden (parallax scroll)
-+---------------------------------------------------+
-|                                                   |
-|     [Fruit 1]  [Fruit 2]  [Fruit 3]              |
-|                                                   |
-|     Each fruit card slides in on scroll           |
-|     with staggered parallax offsets               |
-|                                                   |
-+---------------------------------------------------+
+**`src/components/cellar/ThoughtCard.tsx`**
+- Update to accept a journal entry shape (title, content preview, mood, date)
+- Display as a card with title, snippet, mood indicator, and relative date
 
-Section 3+: Individual Fruit Spotlight
-+---------------------------------------------------+
-|                                                   |
-|        [Large Icon]                               |
-|        "First Seed"                               |
-|        7 days of journaling                       |
-|        "Your journey begins"                      |
-|                                                   |
-|        [Background parallax imagery]              |
-|                                                   |
-+---------------------------------------------------+
-```
+**`src/components/cellar/CellarAISidebar.tsx`**
+- Update the `buildSystemPrompt` to use journal entry content instead of cellar thoughts
+- Accept journal entries as the `thoughts` prop (update the interface)
 
-### GSAP ScrollTrigger Parallax
-```typescript
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-gsap.registerPlugin(ScrollTrigger);
-
-// Parallax on scroll
-gsap.to('.parallax-bg', {
-  y: -100,
-  ease: 'none',
-  scrollTrigger: {
-    trigger: '.section',
-    start: 'top bottom',
-    end: 'bottom top',
-    scrub: true,
-  },
-});
-```
-
-### Expanded "Fruits" (Achievements)
-Rename milestones to "fruits" and add many more:
-
-| Days | Fruit | Name | Description |
-|------|-------|------|-------------|
-| 1 | Seed | First Seed | You planted your first thought |
-| 3 | Sprout | Early Sprout | Three days of growth |
-| 7 | Lemon | First Harvest | A week of consistency |
-| 14 | Strawberry | Sweet Progress | Two weeks strong |
-| 21 | Cherry | Cherry Picked | Three weeks of wisdom |
-| 30 | Apple | Golden Apple | A month of reflection |
-| 45 | Peach | Peach Perfect | Six weeks of dedication |
-| 60 | Orange | Orange Blossom | Two months of growth |
-| 90 | Pomegranate | Rich Harvest | A season of journaling |
-| 100 | Fig | Century Fig | 100 days milestone |
-| 150 | Grape | Vineyard | Five months cultivated |
-| 200 | Mango | Tropical Bliss | 200 days of wisdom |
-| 250 | Pineapple | Golden Crown | 250 days of mastery |
-| 300 | Coconut | Paradise Found | Almost a year |
-| 365 | Olive | The Ancient Olive | A full year of reflection |
-| 500 | Dragonfruit | Mythical Harvest | Beyond extraordinary |
-| 730 | Golden Apple | The Eternal Orchard | Two years of mastery |
-
-### Apple-Style Design Elements
-- Large serif typography sections
-- Generous whitespace between sections
-- Subtle background color shifts per section
-- Parallax depth layers
-- Smooth snap scrolling (optional)
-- Unlocked fruits have a golden glow; locked ones are subtle silhouettes
+The `cellar_thoughts` table and hooks remain in the database but are no longer used by the UI. The `AddThoughtDialog` component is kept but not rendered.
 
 ---
 
-## 8. Squircle Component Consistency
+## 5. Desktop Responsiveness
 
-Update all card and interactive components globally to use `rounded-2xl` (squircle aesthetic):
+### Current Problem
+`PageContainer` constrains everything to `max-w-lg` (512px), making the app look tiny on desktop.
 
-### Changes in `src/index.css`
+### Changes
+
+**`src/components/layout/PageContainer.tsx`**
+- Change container from `max-w-lg` to responsive: `max-w-lg md:max-w-2xl lg:max-w-4xl xl:max-w-5xl`
+- This scales the content area from mobile (512px) to desktop (1024-1280px)
+
+**`src/pages/HomePage.tsx`**
+- Greeting section: center on mobile, left-align on desktop with larger text
+- Chat messages area: wider on desktop (max-w-2xl centered)
+- Header: add more horizontal padding on desktop
+
+**`src/pages/InsightsPage.tsx`**
+- Stats grid: `grid-cols-3` on mobile, `grid-cols-4` on desktop (featured card spans 2)
+- Side-by-side cards: remain 2-col but with more breathing room
+- Monthly progress: full-width with internal padding
+
+**`src/pages/OrchardPage.tsx`**
+- Fruit grid: `grid-cols-2 md:grid-cols-3 lg:grid-cols-4`
+- Hero section: larger text on desktop, more vertical padding
+- Progress card: `max-w-md` centered
+
+**`src/pages/CellarPage.tsx`**
+- Masonry grid: `column-count: 2` on mobile, `3` on tablet, `4` on desktop
+
+**`src/index.css` Masonry Update:**
 ```css
-.glass-card {
-  @apply rounded-2xl border backdrop-blur-xl;
-  /* ... existing styles ... */
-}
-
-.milestone-card {
-  @apply relative rounded-2xl p-6 text-center transition-all duration-500;
-}
-
-.chat-bubble {
-  @apply rounded-2xl px-4 py-3 max-w-[85%];
-}
+.masonry-grid { column-count: 2; column-gap: 1rem; }
+@media (min-width: 768px) { .masonry-grid { column-count: 3; } }
+@media (min-width: 1024px) { .masonry-grid { column-count: 4; } }
 ```
 
-### Global Updates
-- All `.glass-card` components: `rounded-xl` -> `rounded-2xl`
-- All buttons: ensure `rounded-xl` or `rounded-full` (pill buttons)
-- Bottom nav pill: keep `rounded-full`
-- Input fields: `rounded-2xl`
-- Dialog/sheet content: `rounded-2xl`
-- Alert dialogs: `rounded-2xl`
+**`src/pages/CalendarPage.tsx`**
+- Calendar grid scales naturally (7 columns)
+- Entry preview sits beside the calendar on desktop (side-by-side layout)
+
+**`src/pages/ProfilePage.tsx`**
+- Profile card: `max-w-lg` centered on desktop (stays compact, doesn't stretch)
+- Settings links: `max-w-lg` centered
+
+**`src/components/layout/BottomNav.tsx`**
+- Nav pill already floats centered -- works across viewports
+- Add slightly larger icon sizes on desktop: `lg:w-12 lg:h-12`
 
 ---
 
-## 9. Subtle Hover Effects
+## 6. Iconify Icons
 
-Add GSAP-powered or CSS hover effects throughout:
+### Approach
+Install `@iconify/react` package to access premium icon sets (Material Symbols, Phosphor, Tabler, Solar, etc.).
 
-### Card Hover
-```css
-.glass-card {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.glass-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-soft);
-}
-```
+### Icon Replacements
 
-### Button Hover
-```css
-.btn-luxury:hover {
-  transform: translateY(-1px) scale(1.02);
-}
-```
+| Current (Lucide) | Replacement (Iconify) | Set |
+|---|---|---|
+| `Home` | `solar:home-2-bold-duotone` | Solar |
+| `PenLine` | `solar:pen-new-square-bold-duotone` | Solar |
+| `CalendarDays` | `solar:calendar-bold-duotone` | Solar |
+| `TreeDeciduous` | `solar:tree-bold-duotone` | Solar |
+| `Wine` | `solar:archive-bold-duotone` | Solar |
+| `LayoutGrid` | `solar:chart-square-bold-duotone` | Solar |
+| `User` | `solar:user-rounded-bold-duotone` | Solar |
+| `Sparkles` | `solar:stars-bold-duotone` | Solar |
+| `Send` | `solar:plain-bold` | Solar |
+| `Menu` | `solar:hamburger-menu-linear` | Solar |
+| `Moon` | `solar:moon-bold-duotone` | Solar |
+| `Sun` | `solar:sun-bold-duotone` | Solar |
 
-### Nav Icon Hover (in addition to tooltip)
-Slight scale on hover: `hover:scale-110 transition-transform`
+### Files to Update
+- `src/components/layout/BottomNav.tsx` -- all nav icons
+- `src/pages/HomePage.tsx` -- menu, theme toggle icons
+- `src/components/chat/ChatInput.tsx` -- send icon
+- `src/pages/CellarPage.tsx` -- AI button icon
+- `src/components/cellar/CellarAISidebar.tsx` -- close/send icons
 
-### Thought Cards (Cellar)
-On hover: subtle lift + shadow increase + border glow
-
----
-
-## 10. Theme Tuning
-
-### Light Mode - Closer to White
-```css
-:root {
-  --background: 40 20% 97%;      /* Was 36 33% 94% -- now almost white */
-  --card: 40 15% 99%;             /* Was 40 33% 97% -- nearly pure white */
-  --muted: 40 10% 93%;            /* Lighter muted */
-  --secondary: 40 12% 95%;        /* Lighter secondary */
-  --border: 40 10% 90%;           /* Softer border */
-  --input: 40 12% 96%;            /* Lighter input */
-}
-```
-
-### Dark Mode - Dark Graphite (less green)
-```css
-.dark {
-  --background: 200 5% 7%;        /* Was 160 15% 5% -- now neutral dark graphite */
-  --card: 200 4% 11%;             /* Darker, less green */
-  --muted: 200 3% 15%;            /* Neutral dark */
-  --muted-foreground: 200 3% 50%; /* Neutral gray */
-  --secondary: 200 4% 16%;
-  --border: 200 4% 20%;
-  --input: 200 4% 14%;
-  --graphite: 200 5% 7%;
-  --graphite-mid: 200 4% 14%;
-  --graphite-light: 200 4% 20%;
-  --sidebar-background: 200 4% 9%;
-  --sidebar-border: 200 4% 18%;
-}
-```
+Lucide will remain available as a fallback for less critical icons (arrows, chevrons, etc.).
 
 ---
 
-## 11. Files Summary
+## 7. Notifications & Sound Verification
+
+### Notifications
+The current `src/lib/notifications.ts` implementation is solid. Will enhance:
+- Use service worker registration (`navigator.serviceWorker.ready`) for notifications in PWA mode
+- Add `tag: 'aramis-reminder'` to prevent duplicate notifications
+- Verify `AppSettingsPage` toggle actually calls `requestNotificationPermission()`
+
+### Sound Effects
+The `src/lib/sounds.ts` uses Web Audio API with synthesized tones. Will verify:
+- `AudioContext` is resumed on first user gesture (mobile Safari requirement)
+- Add explicit `audioContext.resume()` call in sound initialization
+- Ensure `soundManager.isEnabled()` is exposed and togglable from settings
+
+---
+
+## 8. Tooltip & Micro-Interaction Polish
+
+### Already Working
+- Bottom nav tooltips via Radix Tooltip (verified in code)
+- Hover scale on nav icons: `hover:scale-110`
+- Glass card hover lift: `translateY(-2px)`
+- Button luxury hover: `translateY(-1px) scale(1.02)`
+
+### Enhancements
+- Ensure tooltip `side` is always `"top"` (remove the Cellar-specific "bottom" variant since nav stays at bottom now)
+- Add `active:scale-95` on all interactive buttons for press feedback
+- Ensure thought cards in masonry have the hover lift effect
+- Profile settings links: add hover border glow
+
+---
+
+## Files Summary
 
 ### New Files
 | File | Purpose |
 |------|---------|
-| `src/pages/CellarPage.tsx` | Cellar module with masonry grid |
-| `src/components/cellar/ThoughtCard.tsx` | Individual thought card |
-| `src/components/cellar/AddThoughtDialog.tsx` | Add thought modal |
-| `src/components/cellar/CellarAISidebar.tsx` | AI brainstorming sidebar |
-| `src/hooks/useCellar.ts` | CRUD hooks for cellar_thoughts |
-| `src/lib/notifications.ts` | Push notification helpers |
-| `public/icons/icon-192.png` | PWA icon 192x192 |
-| `public/icons/icon-512.png` | PWA icon 512x512 |
+| `src/components/layout/SplashScreen.tsx` | Minimalist Aramis logo splash on first load |
 
 ### Modified Files
 | File | Changes |
 |------|---------|
-| `vite.config.ts` | Add vite-plugin-pwa |
-| `index.html` | PWA meta tags, apple-mobile-web-app |
-| `src/App.tsx` | Add Cellar route, notification init |
-| `src/index.css` | Theme tuning, squircle updates, masonry CSS, hover effects |
-| `src/components/layout/BottomNav.tsx` | Tooltips, top-nav variant for Cellar |
-| `src/pages/OrchardPage.tsx` | Complete rewrite with GSAP parallax, expanded fruits |
-| `src/pages/InsightsPage.tsx` | Complete layout revamp with dashboard arrangement |
-| `src/pages/AppSettingsPage.tsx` | Hook up real notification permission |
-| `tailwind.config.ts` | Updated graphite tokens |
+| `src/components/layout/PageContainer.tsx` | GSAP blur transition, responsive max-widths |
+| `src/components/layout/BottomNav.tsx` | Remove top-nav variant, keep at bottom always, Iconify icons |
+| `src/pages/CellarPage.tsx` | Use journal entries instead of cellar_thoughts, remove FAB |
+| `src/components/cellar/ThoughtCard.tsx` | Accept journal entry shape |
+| `src/components/cellar/CellarAISidebar.tsx` | Use journal entries as context |
+| `src/pages/HomePage.tsx` | Iconify icons, desktop responsive layout |
+| `src/pages/InsightsPage.tsx` | Desktop grid breakpoints |
+| `src/pages/OrchardPage.tsx` | Desktop grid breakpoints |
+| `src/pages/CalendarPage.tsx` | Side-by-side layout on desktop |
+| `src/pages/ProfilePage.tsx` | Centered max-w on desktop |
+| `src/components/chat/ChatInput.tsx` | Iconify send icon |
+| `src/index.css` | Masonry breakpoints for desktop |
+| `src/App.tsx` | Add splash screen logic |
+| `src/lib/notifications.ts` | Service worker notification, tag |
+| `src/lib/sounds.ts` | AudioContext resume on gesture |
+| `package.json` | Add `@iconify/react` dependency |
 
-### Database Migration
-- Create `cellar_thoughts` table with RLS policies
+### No Database Changes Required
+The cellar_thoughts table stays in the database but the UI will read from journal_entries instead.
 
 ---
 
-## 12. Implementation Order
+## Implementation Order
 
-1. **Theme tuning** (light/dark mode adjustments)
-2. **Squircle + hover effects** (global CSS updates)
-3. **PWA setup** (vite-plugin-pwa, manifest, icons, meta tags)
-4. **Bottom nav tooltips**
-5. **Push notifications** (notification utility + settings integration)
-6. **Cellar module** (database migration, page, masonry grid, AI sidebar)
-7. **Insights revamp** (dashboard layout redesign)
-8. **Orchard revamp** (GSAP ScrollTrigger parallax, expanded fruits)
-9. **Sound effects verification**
-10. **Testing** (PWA install, notifications, masonry, parallax)
+1. Install `@iconify/react` dependency
+2. Create `SplashScreen.tsx` and integrate into `App.tsx`
+3. Update `PageContainer.tsx` (GSAP blur + responsive widths)
+4. Fix `BottomNav.tsx` (remove top-nav, add Iconify icons)
+5. Refactor `CellarPage.tsx` to use journal entries
+6. Update all page layouts for desktop responsiveness
+7. Swap remaining icons to Iconify across pages
+8. Polish notifications and sound effects
+9. Test across mobile and desktop viewports
+

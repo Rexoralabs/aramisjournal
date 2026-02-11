@@ -1,15 +1,15 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
-import { X, Send } from "lucide-react";
+import { Icon } from "@iconify/react";
 import gsap from "gsap";
 import { useStreamChat } from "@/hooks/useStreamChat";
 import { haptic } from "@/lib/haptics";
 import { soundManager } from "@/lib/sounds";
-import type { CellarThought } from "@/hooks/useCellar";
+import type { JournalEntry } from "@/hooks/useJournal";
 
 interface CellarAISidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  thoughts: CellarThought[];
+  entries: JournalEntry[];
 }
 
 interface Message {
@@ -17,7 +17,7 @@ interface Message {
   content: string;
 }
 
-export function CellarAISidebar({ isOpen, onClose, thoughts }: CellarAISidebarProps) {
+export function CellarAISidebar({ isOpen, onClose, entries }: CellarAISidebarProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -40,8 +40,11 @@ export function CellarAISidebar({ isOpen, onClose, thoughts }: CellarAISidebarPr
   }, [messages, streamContent]);
 
   const buildSystemPrompt = () => {
-    const thoughtsText = thoughts.map(t => `- "${t.content}"`).join("\n");
-    return `You are Aramis, helping the user explore their stored thoughts. Here are their current thoughts:\n\n${thoughtsText}\n\nAsk questions, find connections, and brainstorm ideas based on what they've written. Be concise and insightful.`;
+    const entriesText = entries
+      .slice(0, 20)
+      .map(e => `- "${e.title || "Untitled"}" (${e.entry_date}): ${e.content.slice(0, 200)}`)
+      .join("\n");
+    return `You are Aramis, helping the user explore their journal entries. Here are their recent entries:\n\n${entriesText}\n\nAsk questions, find connections, and brainstorm ideas based on what they've written. Be concise and insightful.`;
   };
 
   const handleSend = async () => {
@@ -92,7 +95,7 @@ export function CellarAISidebar({ isOpen, onClose, thoughts }: CellarAISidebarPr
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h2 className="font-serif text-lg text-foreground">Thought Explorer</h2>
         <button onClick={onClose} className="p-2 rounded-2xl hover:bg-muted transition-colors">
-          <X className="h-5 w-5 text-muted-foreground" />
+          <Icon icon="solar:close-circle-linear" className="h-5 w-5 text-muted-foreground" />
         </button>
       </div>
 
@@ -100,7 +103,7 @@ export function CellarAISidebar({ isOpen, onClose, thoughts }: CellarAISidebarPr
       <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide">
         {messages.length === 0 && !streamContent && (
           <p className="text-sm text-muted-foreground text-center mt-8 font-ui">
-            Ask me about your thoughts. I'll help you find connections and deeper meaning.
+            Ask me about your journal entries. I'll help you find connections and deeper meaning.
           </p>
         )}
         {messages.map((msg, i) => (
@@ -144,9 +147,9 @@ export function CellarAISidebar({ isOpen, onClose, thoughts }: CellarAISidebarPr
           <button
             onClick={handleSend}
             disabled={!input.trim() || isStreaming}
-            className="h-10 w-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-50 hover:scale-105 transition-transform"
+            className="h-10 w-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-50 hover:scale-105 active:scale-95 transition-transform"
           >
-            <Send className="h-4 w-4" />
+            <Icon icon="solar:plain-bold" className="h-4 w-4" />
           </button>
         </div>
       </div>

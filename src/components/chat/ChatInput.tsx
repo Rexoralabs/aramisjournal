@@ -1,5 +1,5 @@
 import { useState, useRef, useLayoutEffect } from "react";
-import { Send } from "lucide-react";
+import { Icon } from "@iconify/react";
 import gsap from "gsap";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +29,6 @@ export function ChatInput({ onSend, disabled, placeholder, centered }: ChatInput
     if (!message.trim() || disabled) return;
     onSend(message.trim());
     setMessage("");
-    // Reset height
     if (inputRef.current) {
       inputRef.current.style.height = "auto";
     }
@@ -42,7 +41,6 @@ export function ChatInput({ onSend, disabled, placeholder, centered }: ChatInput
     }
   };
 
-  // Auto-resize textarea
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
     if (inputRef.current) {
@@ -75,7 +73,7 @@ export function ChatInput({ onSend, disabled, placeholder, centered }: ChatInput
           disabled={!message.trim() || disabled}
           className="p-2.5 sm:p-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 touch-target"
         >
-          <Send className="h-4 w-4 sm:h-5 sm:w-5" />
+          <Icon icon="solar:plain-bold" className="h-4 w-4 sm:h-5 sm:w-5" />
         </button>
       </div>
     </div>

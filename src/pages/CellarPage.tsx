@@ -1,20 +1,17 @@
 import { useState, useRef, useLayoutEffect } from "react";
-import { Sparkles } from "lucide-react";
+import { Icon } from "@iconify/react";
 import gsap from "gsap";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { ThoughtCard } from "@/components/cellar/ThoughtCard";
-import { AddThoughtDialog } from "@/components/cellar/AddThoughtDialog";
 import { CellarAISidebar } from "@/components/cellar/CellarAISidebar";
-import { useCellarThoughts, useCreateThought, useDeleteThought } from "@/hooks/useCellar";
+import { useJournalEntries } from "@/hooks/useJournal";
 import { haptic } from "@/lib/haptics";
 
 const CellarPage = () => {
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { data: thoughts = [] } = useCellarThoughts();
-  const createThought = useCreateThought();
-  const deleteThought = useDeleteThought();
+  const { data: entries = [] } = useJournalEntries();
 
   useLayoutEffect(() => {
     if (containerRef.current) {
@@ -29,7 +26,7 @@ const CellarPage = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-serif text-foreground">The Cellar</h1>
-            <p className="text-sm text-muted-foreground font-ui mt-1">Store your loose thoughts</p>
+            <p className="text-sm text-muted-foreground font-ui mt-1">Your stored reflections</p>
           </div>
           <button
             onClick={() => {
@@ -38,37 +35,30 @@ const CellarPage = () => {
             }}
             className="h-10 w-10 rounded-2xl bg-primary/15 flex items-center justify-center hover:bg-primary/25 transition-colors touch-target"
           >
-            <Sparkles className="h-5 w-5 text-primary" />
+            <Icon icon="solar:stars-bold-duotone" className="h-5 w-5 text-primary" />
           </button>
         </div>
 
         {/* Masonry Grid */}
-        {thoughts.length === 0 ? (
+        {entries.length === 0 ? (
           <div className="text-center py-20">
             <p className="font-emphasis text-lg text-muted-foreground">Your cellar is empty.</p>
-            <p className="text-sm text-muted-foreground font-ui mt-2">Tap + to store your first thought.</p>
+            <p className="text-sm text-muted-foreground font-ui mt-2">Start writing in the Write module to see your entries here.</p>
           </div>
         ) : (
           <div className="masonry-grid">
-            {thoughts.map((thought) => (
-              <ThoughtCard
-                key={thought.id}
-                thought={thought}
-                onDelete={(id) => deleteThought.mutate(id)}
-              />
+            {entries.map((entry) => (
+              <ThoughtCard key={entry.id} entry={entry} />
             ))}
           </div>
         )}
-
-        {/* FAB */}
-        <AddThoughtDialog onAdd={(content) => createThought.mutate({ content })} />
       </div>
 
       {/* AI Sidebar */}
       <CellarAISidebar
         isOpen={aiSidebarOpen}
         onClose={() => setAiSidebarOpen(false)}
-        thoughts={thoughts}
+        entries={entries}
       />
     </PageContainer>
   );

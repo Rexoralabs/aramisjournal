@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Menu, Moon, Sun } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { getDayOfYear } from "date-fns";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { GreetingHeader } from "@/components/chat/GreetingHeader";
@@ -40,7 +40,6 @@ const HomePage = () => {
   const displayName = profile?.display_name || "Writer";
   const dayOfYear = getDayOfYear(new Date());
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingContent]);
@@ -56,28 +55,24 @@ const HomePage = () => {
     haptic('medium');
     soundManager.play('send');
 
-    // Create new conversation if none exists
     if (!conversationId) {
       const newConv = await createConversation.mutateAsync(undefined);
       conversationId = newConv.id;
       setCurrentConversationId(conversationId);
     }
 
-    // Add user message
     await addMessage.mutateAsync({
       conversationId,
       role: "user",
       content,
     });
 
-    // Update conversation title from first message if untitled
     const currentConv = conversations.find(c => c.id === conversationId);
     if (!currentConv?.title && content.length > 0) {
       const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
       await updateTitle.mutateAsync({ id: conversationId, title });
     }
 
-    // Stream AI response
     setIsTyping(true);
     setStreamingContent("");
 
@@ -140,7 +135,7 @@ const HomePage = () => {
             }}
             className="p-2 rounded-lg hover:bg-muted transition-colors touch-target"
           >
-            <Menu className="h-5 w-5 text-muted-foreground" />
+            <Icon icon="solar:hamburger-menu-linear" className="h-5 w-5 text-muted-foreground" />
           </button>
 
           <div className="text-center">
@@ -157,9 +152,9 @@ const HomePage = () => {
             className="p-2 rounded-lg hover:bg-muted transition-colors touch-target"
           >
             {theme === "dark" ? (
-              <Sun className="h-5 w-5 text-muted-foreground" />
+              <Icon icon="solar:sun-bold-duotone" className="h-5 w-5 text-muted-foreground" />
             ) : (
-              <Moon className="h-5 w-5 text-muted-foreground" />
+              <Icon icon="solar:moon-bold-duotone" className="h-5 w-5 text-muted-foreground" />
             )}
           </button>
         </div>
@@ -167,10 +162,7 @@ const HomePage = () => {
         {/* Content area */}
         {showGreeting ? (
           <>
-            {/* Greeting (centered when no messages) */}
             <GreetingHeader displayName={displayName} />
-            
-            {/* Centered Input */}
             <div className="pb-8">
               <ChatInput
                 onSend={handleSendMessage}
@@ -182,7 +174,6 @@ const HomePage = () => {
           </>
         ) : (
           <>
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto py-4 space-y-4 scrollbar-hide">
               {messages.map((msg, idx) => (
                 <ChatMessage
@@ -192,7 +183,6 @@ const HomePage = () => {
                 />
               ))}
 
-              {/* Streaming message */}
               {streamingContent && (
                 <div className="flex justify-start">
                   <div className="chat-bubble-assistant">
@@ -203,7 +193,6 @@ const HomePage = () => {
                 </div>
               )}
 
-              {/* Typing indicator (before first token) */}
               {isTyping && !streamingContent && (
                 <div className="flex justify-start">
                   <div className="chat-bubble-assistant">
@@ -219,7 +208,6 @@ const HomePage = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input at bottom */}
             <div className="pb-4">
               <ChatInput
                 onSend={handleSendMessage}

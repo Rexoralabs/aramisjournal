@@ -1,31 +1,40 @@
-import { Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import type { CellarThought } from "@/hooks/useCellar";
+import type { JournalEntry } from "@/hooks/useJournal";
+
+const moodEmoji: Record<string, string> = {
+  amazing: "✨",
+  good: "😊",
+  okay: "😐",
+  down: "😔",
+  rough: "😢",
+};
 
 interface ThoughtCardProps {
-  thought: CellarThought;
-  onDelete: (id: string) => void;
+  entry: JournalEntry;
 }
 
-export function ThoughtCard({ thought, onDelete }: ThoughtCardProps) {
+export function ThoughtCard({ entry }: ThoughtCardProps) {
+  const preview = entry.content.length > 120
+    ? entry.content.slice(0, 120) + "…"
+    : entry.content;
+
   return (
     <div className="thought-card group relative">
-      <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-        {thought.content}
+      {entry.title && (
+        <h3 className="text-sm font-serif text-foreground mb-1.5 line-clamp-2">
+          {entry.title}
+        </h3>
+      )}
+      <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+        {preview}
       </p>
       <div className="flex items-center justify-between mt-3">
-        <span className="text-xs text-muted-foreground font-ui">
-          {format(new Date(thought.created_at), "MMM d")}
+        <span className="text-[10px] text-muted-foreground font-ui">
+          {format(new Date(entry.entry_date), "MMM d")}
         </span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(thought.id);
-          }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-destructive/10"
-        >
-          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-        </button>
+        {entry.mood && (
+          <span className="text-sm">{moodEmoji[entry.mood] || ""}</span>
+        )}
       </div>
     </div>
   );

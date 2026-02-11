@@ -319,6 +319,12 @@
     }
   }
 
+  @media (min-width: 1024px) {
+    .masonry-grid {
+      column-count: 4;
+    }
+  }
+
   /* Thought card */
   .thought-card {
     @apply rounded-2xl p-4 border transition-all duration-300 cursor-pointer;

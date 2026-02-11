@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, PenLine, CalendarDays, TreeDeciduous, LayoutGrid, User, Wine } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { useRef, useLayoutEffect } from "react";
 import { format } from "date-fns";
 import gsap from "gsap";
@@ -8,40 +8,31 @@ import { haptic } from "@/lib/haptics";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 const navItems = [
-  { path: "/", icon: Home, label: "Home" },
-  { path: "/write", icon: PenLine, label: "Write" },
-  { path: "/calendar", icon: CalendarDays, label: "Calendar" },
-  { path: "/orchard", icon: TreeDeciduous, label: "Orchard" },
-  { path: "/cellar", icon: Wine, label: "Cellar" },
-  { path: "/insights", icon: LayoutGrid, label: "Insights" },
-  { path: "/profile", icon: User, label: "Profile" },
+  { path: "/", icon: "solar:home-2-bold-duotone", label: "Home" },
+  { path: "/write", icon: "solar:pen-new-square-bold-duotone", label: "Write" },
+  { path: "/calendar", icon: "solar:calendar-bold-duotone", label: "Calendar" },
+  { path: "/orchard", icon: "solar:tree-bold-duotone", label: "Orchard" },
+  { path: "/cellar", icon: "solar:archive-bold-duotone", label: "Cellar" },
+  { path: "/insights", icon: "solar:chart-square-bold-duotone", label: "Insights" },
+  { path: "/profile", icon: "solar:user-rounded-bold-duotone", label: "Profile" },
 ];
 
 export function BottomNav() {
   const location = useLocation();
-  const navRef = useRef<HTMLDivElement>(null);
   const pillRef = useRef<HTMLDivElement>(null);
-
-  const isCellar = location.pathname === "/cellar";
 
   useLayoutEffect(() => {
     if (pillRef.current) {
       gsap.fromTo(
         pillRef.current,
-        { opacity: 0, y: isCellar ? -20 : 20 },
+        { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.4, delay: 0.2, ease: "power2.out" }
       );
     }
-  }, [isCellar]);
+  }, []);
 
   return (
-    <nav
-      ref={navRef}
-      className={cn(
-        "fixed left-0 right-0 z-50 px-4",
-        isCellar ? "top-0 pt-safe pt-2" : "bottom-4 pb-safe"
-      )}
-    >
+    <nav className="fixed left-0 right-0 z-50 bottom-4 pb-safe px-4">
       <div className="flex items-end justify-center relative">
         <div
           ref={pillRef}
@@ -49,7 +40,6 @@ export function BottomNav() {
         >
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
-            const Icon = item.icon;
 
             return (
               <Tooltip key={item.path} delayDuration={300}>
@@ -58,13 +48,14 @@ export function BottomNav() {
                     to={item.path}
                     onClick={() => haptic("selection")}
                     className={cn(
-                      "w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 touch-target",
+                      "w-9 h-9 sm:w-10 sm:h-10 lg:w-11 lg:h-11 rounded-full flex items-center justify-center transition-all duration-200 touch-target",
                       isActive
                         ? "bg-primary/15"
                         : "hover:bg-muted/50 hover:scale-110 active:scale-95"
                     )}
                   >
                     <Icon
+                      icon={item.icon}
                       className={cn(
                         "h-[18px] w-[18px] sm:h-5 sm:w-5 transition-colors duration-200",
                         isActive ? "text-primary" : "text-muted-foreground"
@@ -73,7 +64,7 @@ export function BottomNav() {
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent
-                  side={isCellar ? "bottom" : "top"}
+                  side="top"
                   className="font-ui text-xs rounded-xl"
                 >
                   {item.label}
@@ -83,11 +74,9 @@ export function BottomNav() {
           })}
         </div>
 
-        {!isCellar && (
-          <span className="absolute right-4 sm:right-6 bottom-1 text-xs font-ui text-muted-foreground">
-            {format(new Date(), "MM.dd.yy")}
-          </span>
-        )}
+        <span className="absolute right-4 sm:right-6 bottom-1 text-xs font-ui text-muted-foreground">
+          {format(new Date(), "MM.dd.yy")}
+        </span>
       </div>
     </nav>
   );

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { format, isToday, isYesterday, isThisWeek, parseISO } from "date-fns";
-import { MessageCircle, Plus, Trash2, Search, ChevronDown, FilePlus2 } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { cn } from "@/lib/utils";
 import { ChatConversation, useDeleteConversation } from "@/hooks/useChatHistory";
 import { haptic } from "@/lib/haptics";
@@ -29,15 +29,10 @@ function groupConversations(conversations: ChatConversation[]): ConversationGrou
 
   conversations.forEach((conv) => {
     const date = parseISO(conv.updated_at);
-    if (isToday(date)) {
-      today.push(conv);
-    } else if (isYesterday(date)) {
-      yesterday.push(conv);
-    } else if (isThisWeek(date)) {
-      thisWeek.push(conv);
-    } else {
-      earlier.push(conv);
-    }
+    if (isToday(date)) today.push(conv);
+    else if (isYesterday(date)) yesterday.push(conv);
+    else if (isThisWeek(date)) thisWeek.push(conv);
+    else earlier.push(conv);
   });
 
   const groups: ConversationGroup[] = [];
@@ -45,7 +40,6 @@ function groupConversations(conversations: ChatConversation[]): ConversationGrou
   if (yesterday.length) groups.push({ label: "Yesterday", conversations: yesterday });
   if (thisWeek.length) groups.push({ label: "This Week", conversations: thisWeek });
   if (earlier.length) groups.push({ label: "Earlier", conversations: earlier });
-
   return groups;
 }
 
@@ -64,24 +58,16 @@ export function ChatSidebar({
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations;
     const query = searchQuery.toLowerCase();
-    return conversations.filter(
-      (conv) =>
-        conv.title?.toLowerCase().includes(query)
-    );
+    return conversations.filter((conv) => conv.title?.toLowerCase().includes(query));
   }, [conversations, searchQuery]);
 
-  const groupedConversations = useMemo(
-    () => groupConversations(filteredConversations),
-    [filteredConversations]
-  );
+  const groupedConversations = useMemo(() => groupConversations(filteredConversations), [filteredConversations]);
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     haptic('error');
     await deleteConversation.mutateAsync(id);
-    if (currentConversationId === id) {
-      onNewConversation();
-    }
+    if (currentConversationId === id) onNewConversation();
   };
 
   const handleNewChat = () => {
@@ -93,43 +79,21 @@ export function ChatSidebar({
 
   return (
     <>
-      {/* Overlay for mobile */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden"
-          onClick={onClose}
-        />
-      )}
+      {isOpen && <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden" onClick={onClose} />}
 
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed left-0 top-0 h-full w-72 bg-card border-r border-border z-50 transition-transform duration-300",
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
+      <aside className={cn("fixed left-0 top-0 h-full w-72 bg-card border-r border-border z-50 transition-transform duration-300", isOpen ? "translate-x-0" : "-translate-x-full")}>
         <div className="flex flex-col h-full p-4">
-          {/* Header with search */}
           <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg hover:bg-muted transition-colors touch-target"
-            >
-              <ChevronDown className="h-5 w-5 text-muted-foreground rotate-90" />
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors touch-target">
+              <Icon icon="ph:caret-left" className="h-5 w-5 text-muted-foreground" />
             </button>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {}}
-                className="p-2 rounded-lg hover:bg-muted transition-colors touch-target"
-              >
-                <Search className="h-5 w-5 text-muted-foreground" />
-              </button>
-            </div>
+            <button className="p-2 rounded-lg hover:bg-muted transition-colors touch-target">
+              <Icon icon="ph:magnifying-glass" className="h-5 w-5 text-muted-foreground" />
+            </button>
           </div>
 
-          {/* Search input */}
           <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Icon icon="ph:magnifying-glass" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search conversations..."
@@ -139,74 +103,47 @@ export function ChatSidebar({
             />
           </div>
 
-          {/* New Chat button */}
-          <button
-            onClick={handleNewChat}
-            className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/15 transition-colors mb-4 touch-target"
-          >
-            <FilePlus2 className="h-5 w-5 text-primary" />
+          <button onClick={handleNewChat} className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/15 transition-colors mb-4 touch-target">
+            <Icon icon="ph:file-plus-duotone" className="h-5 w-5 text-primary" />
             <span className="font-ui text-sm text-foreground">New Chat</span>
           </button>
 
-          {/* Convos section */}
           <Collapsible open={convosOpen} onOpenChange={setConvosOpen}>
             <CollapsibleTrigger className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors mb-2">
-              <span className="text-xs font-ui text-muted-foreground uppercase tracking-wider">
-                Convos
-              </span>
-              <ChevronDown
-                className={cn(
-                  "h-4 w-4 text-muted-foreground transition-transform",
-                  convosOpen && "rotate-180"
-                )}
-              />
+              <span className="text-xs font-ui text-muted-foreground uppercase tracking-wider">Convos</span>
+              <Icon icon="ph:caret-down" className={cn("h-4 w-4 text-muted-foreground transition-transform", convosOpen && "rotate-180")} />
             </CollapsibleTrigger>
 
             <CollapsibleContent>
               <div className="flex-1 overflow-y-auto space-y-4 scrollbar-hide">
                 {groupedConversations.length === 0 ? (
                   <div className="text-center py-8">
-                    <MessageCircle className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      {searchQuery ? "No matches found" : "No conversations yet"}
-                    </p>
+                    <Icon icon="ph:chat-circle-duotone" className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                    <p className="text-sm text-muted-foreground">{searchQuery ? "No matches found" : "No conversations yet"}</p>
                   </div>
                 ) : (
                   groupedConversations.map((group) => (
                     <div key={group.label}>
-                      <p className="text-xs font-ui text-muted-foreground mb-2 px-1">
-                        {group.label}
-                      </p>
+                      <p className="text-xs font-ui text-muted-foreground mb-2 px-1">{group.label}</p>
                       <div className="space-y-1">
                         {group.conversations.map((conv) => (
                           <button
                             key={conv.id}
-                            onClick={() => {
-                              haptic('selection');
-                              onSelectConversation(conv.id);
-                              onClose();
-                            }}
-                            className={cn(
-                              "w-full text-left p-3 rounded-lg transition-colors group touch-target",
-                              currentConversationId === conv.id
-                                ? "bg-primary/10 border border-primary/20"
-                                : "hover:bg-muted"
+                            onClick={() => { haptic('selection'); onSelectConversation(conv.id); onClose(); }}
+                            className={cn("w-full text-left p-3 rounded-lg transition-colors group touch-target",
+                              currentConversationId === conv.id ? "bg-primary/10 border border-primary/20" : "hover:bg-muted"
                             )}
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm text-foreground truncate font-sans">
-                                  {conv.title || "New conversation"}
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-0.5 font-ui">
-                                  {format(new Date(conv.updated_at), "h:mm a")}
-                                </p>
+                                <p className="text-sm text-foreground truncate font-sans">{conv.title || "New conversation"}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5 font-ui">{format(new Date(conv.updated_at), "h:mm a")}</p>
                               </div>
                               <button
                                 onClick={(e) => handleDelete(e, conv.id)}
                                 className="p-1.5 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 transition-all touch-target"
                               >
-                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                <Icon icon="ph:trash" className="h-3.5 w-3.5 text-destructive" />
                               </button>
                             </div>
                           </button>

@@ -73,7 +73,7 @@ export function ChatInput({ onSend, disabled, placeholder, centered }: ChatInput
           disabled={!message.trim() || disabled}
           className="p-2.5 sm:p-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 touch-target"
         >
-          <Icon icon="solar:plain-bold" className="h-4 w-4 sm:h-5 sm:w-5" />
+          <Icon icon="ph:paper-plane-right-fill" className="h-4 w-4 sm:h-5 sm:w-5" />
         </button>
       </div>
     </div>

@@ -4,6 +4,13 @@ import gsap from "gsap";
 import { useStreamChat } from "@/hooks/useStreamChat";
 import { haptic } from "@/lib/haptics";
 import { soundManager } from "@/lib/sounds";
+import {
+  useChatConversations,
+  useChatMessages,
+  useCreateConversation,
+  useAddMessage,
+  useUpdateConversationTitle,
+} from "@/hooks/useChatHistory";
 import type { JournalEntry } from "@/hooks/useJournal";
 
 interface CellarAISidebarProps {
@@ -12,19 +19,20 @@ interface CellarAISidebarProps {
   entries: JournalEntry[];
 }
 
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
-
 export function CellarAISidebar({ isOpen, onClose, entries }: CellarAISidebarProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamContent, setStreamContent] = useState("");
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { streamChat } = useStreamChat();
+
+  const { data: conversations = [] } = useChatConversations();
+  const { data: messages = [] } = useChatMessages(conversationId);
+  const createConversation = useCreateConversation();
+  const addMessage = useAddMessage();
+  const updateTitle = useUpdateConversationTitle();
 
   useLayoutEffect(() => {
     if (!panelRef.current) return;
@@ -52,30 +60,47 @@ export function CellarAISidebar({ isOpen, onClose, entries }: CellarAISidebarPro
     haptic("medium");
     soundManager.play("send");
 
-    const userMsg: Message = { role: "user", content: input.trim() };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    let convId = conversationId;
+
+    // Create or reuse conversation
+    if (!convId) {
+      const newConv = await createConversation.mutateAsync("Cellar Chat");
+      convId = newConv.id;
+      setConversationId(convId);
+    }
+
+    const userContent = input.trim();
     setInput("");
+
+    await addMessage.mutateAsync({ conversationId: convId, role: "user", content: userContent });
+
+    // Update title from first message
+    if (messages.length === 0) {
+      const title = userContent.slice(0, 50) + (userContent.length > 50 ? "..." : "");
+      await updateTitle.mutateAsync({ id: convId, title });
+    }
+
     setIsStreaming(true);
     setStreamContent("");
 
-    let fullResponse = "";
     const chatMsgs = [
       { role: "user" as const, content: buildSystemPrompt() },
-      ...newMessages,
+      ...messages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+      { role: "user" as const, content: userContent },
     ];
 
+    let fullResponse = "";
     await streamChat({
       messages: chatMsgs,
       onDelta: (chunk) => {
         fullResponse += chunk;
         setStreamContent(fullResponse);
       },
-      onDone: () => {
+      onDone: async () => {
         setIsStreaming(false);
         setStreamContent("");
-        if (fullResponse) {
-          setMessages(prev => [...prev, { role: "assistant", content: fullResponse }]);
+        if (fullResponse && convId) {
+          await addMessage.mutateAsync({ conversationId: convId, role: "assistant", content: fullResponse });
         }
         haptic("success");
         soundManager.play("receive");
@@ -91,15 +116,13 @@ export function CellarAISidebar({ isOpen, onClose, entries }: CellarAISidebarPro
 
   return (
     <div ref={panelRef} className="fixed top-0 right-0 bottom-0 w-full sm:w-96 z-50 bg-card border-l border-border flex flex-col shadow-2xl">
-      {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h2 className="font-serif text-lg text-foreground">Thought Explorer</h2>
         <button onClick={onClose} className="p-2 rounded-2xl hover:bg-muted transition-colors">
-          <Icon icon="solar:close-circle-linear" className="h-5 w-5 text-muted-foreground" />
+          <Icon icon="ph:x-circle" className="h-5 w-5 text-muted-foreground" />
         </button>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide">
         {messages.length === 0 && !streamContent && (
           <p className="text-sm text-muted-foreground text-center mt-8 font-ui">
@@ -107,7 +130,7 @@ export function CellarAISidebar({ isOpen, onClose, entries }: CellarAISidebarPro
           </p>
         )}
         {messages.map((msg, i) => (
-          <div key={i} className={msg.role === "user" ? "flex justify-end" : "flex justify-start"}>
+          <div key={msg.id || i} className={msg.role === "user" ? "flex justify-end" : "flex justify-start"}>
             <div className={msg.role === "user" ? "chat-bubble-user" : "chat-bubble-assistant"}>
               <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
             </div>
@@ -134,7 +157,6 @@ export function CellarAISidebar({ isOpen, onClose, entries }: CellarAISidebarPro
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <div className="p-4 border-t border-border">
         <div className="flex items-center gap-2">
           <input
@@ -149,7 +171,7 @@ export function CellarAISidebar({ isOpen, onClose, entries }: CellarAISidebarPro
             disabled={!input.trim() || isStreaming}
             className="h-10 w-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-50 hover:scale-105 active:scale-95 transition-transform"
           >
-            <Icon icon="solar:plain-bold" className="h-4 w-4" />
+            <Icon icon="ph:paper-plane-right-fill" className="h-4 w-4" />
           </button>
         </div>
       </div>

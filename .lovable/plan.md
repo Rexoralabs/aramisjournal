@@ -1,275 +1,424 @@
+# Aramis Comprehensive Refinement Plan
 
-
-# Aramis Refinement Plan
-## Page Transitions, Loading Screen, Cellar Fix, Desktop Responsiveness, Iconify Icons & Nav Polish
+## Write Module Overhaul, Icons Migration, Calendar Animation, Orchard 3D, Cellar AI Unification, Insights Charts, Settings Expansion, Home Layout Match
 
 ---
 
 ## Overview
 
-This plan addresses 8 specific refinements:
+This plan addresses 12 distinct changes across the application:
 
-1. **GSAP blurred page transitions** (0.5s blur fade between routes)
-2. **Minimalist loading/splash screen** with Aramis logo on first load
-3. **Cellar nav stays at bottom** (revert top nav behavior)
-4. **Cellar populates from journal entries** (Write module data feeds into Cellar)
-5. **Desktop responsiveness** with proper breakpoints (not everything centered in a narrow column)
-6. **Iconify icons** for premium icon quality
-7. **Notifications verification** and sound effects verification
-8. **Tooltip and micro-interaction polish**
-9. **All Motion Must Use GSAP Motion Libraries**
+1. **Write Module** -- Remove mood selector, "Today" button, save button; add auto-save, formatting toolbar, AI summary, and entry sidebar
+2. **Remove date from bottom nav** ("02.12.26")
+3. **Switch all icons from Solar Iconify to Phosphor** icons
+4. **Calendar** -- Make grid smaller, add GSAP flip-up/flip-down page animation for month transitions
+5. **Fix Orchard icon** in bottom nav (not showing)
+6. **Orchard 3D immersive experience** -- Full parallax walkthrough with trees, grass, depth layers using GSAP ScrollTrigger (**React Three Fiber (R3F)**, **Three.js**, **WebGL**, and **GSAP**)
+7. **Cellar AI unification** -- Cellar sidebar AI shares the same conversation history as Home chat
+8. **Insights** -- Add a line graph and bar graph (using Recharts, already installed)
+9. **Settings module** -- Add more features and content
+10. **Home page** -- Match the wireframe layout exactly (sidebar, "43 of 365", greeting, pill input, 5-icon nav)
+
 ---
 
-## 1. GSAP Blurred Page Transitions
+## 1. Write Module Overhaul
 
-### Current State
-`PageContainer` uses Framer Motion with a simple opacity+y fade. No blur effect.
+### Removals
 
-### Changes
+- **Mood selector button** (lines 226-242 in WritePage.tsx) -- Remove the emoji circle button and the `showMoodSelector` state and `MoodSelector` dropdown
+- **"Today" entry selector button** (lines 186-224) -- Remove the dropdown that shows "Today" with a chevron and entry list
+- **Save button** (lines 269-278) -- Remove the manual save/update button
+- **Date display** (lines 294-299) -- Remove the "Wednesday, February 12, 2026" line
 
-**`src/components/layout/PageContainer.tsx`**
-Replace Framer Motion with GSAP for a 0.5s blurred transition:
+### Auto-Save
+
+Add a debounced auto-save using `useEffect` + `useCallback`:
+
+- Debounce timer of 1.5 seconds after typing stops
+- Auto-save triggers `updateEntry` if entry exists, or `createEntry` if new
+- Show a subtle "Saved" indicator (small text near the word count)
+- Track save status: "Saving...", "Saved", or unsaved indicator
+
+### Formatting Toolbar
+
+Add a simple formatting bar above the text area with basic controls:
+
+- **Bold** (wraps selection in `**text**`)
+- **Italic** (wraps in `*text*`)
+- **Heading** (prepends `##` )
+- **List** (prepends `-` )
+- **Quote** (prepends `>` )
+
+The content remains stored as plain text with markdown syntax. The toolbar inserts markdown characters around the cursor position or selection.
+
+### AI Summary Button
+
+- Add a button below the content area labeled "Generate Summary"
+- When pressed, send the current content to the `chat` edge function with a system prompt: "Summarize the following journal entry in 2-6 concise sentences."
+- Display the summary in a glass-card below the editor with a subtle fade-in animation
+- The summary Should Be editable and saved in DB
+
+### Entry Sidebar
+
+Add a sidebar (similar to ChatSidebar) on the Write page:
+
+- **Hamburger button** in the header to toggle it
+- **"New Entry"** button at top
+- **Entry list** showing all journal entries with title, date, and a delete button
+- **Delete confirmation** via AlertDialog
+- Clicking an entry loads it into the editor (same as current `handleSelectEntry` logic)
+
+---
+
+## 2. Remove Date from Bottom Nav
+
+In `BottomNav.tsx` line 77-79, remove:
 
 ```tsx
-export function PageContainer({ children, className }: PageContainerProps) {
-  const ref = useRef<HTMLDivElement>(null);
+<span className="absolute right-4 sm:right-6 bottom-1 text-xs font-ui text-muted-foreground">
+  {format(new Date(), "MM.dd.yy")}
+</span>
+```
 
-  useLayoutEffect(() => {
-    if (!ref.current) return;
-    gsap.fromTo(ref.current,
-      { opacity: 0, filter: "blur(8px)" },
-      { opacity: 1, filter: "blur(0px)", duration: 0.5, ease: "power2.out" }
+---
+
+## 3. Switch to Phosphor Icons
+
+Replace all `@iconify/react` Solar icons with Phosphor icons. Phosphor icons are available via Iconify with the prefix `ph:`.
+
+### Icon Mapping
+
+
+| Current Solar Icon                  | Phosphor Replacement        |
+| ----------------------------------- | --------------------------- |
+| `solar:home-2-bold-duotone`         | `ph:house-duotone`          |
+| `solar:pen-new-square-bold-duotone` | `ph:pencil-simple-duotone`  |
+| `solar:calendar-bold-duotone`       | `ph:calendar-duotone`       |
+| `solar:tree-bold-duotone`           | `ph:tree-duotone`           |
+| `solar:archive-bold-duotone`        | `ph:vault-duotone`          |
+| `solar:chart-square-bold-duotone`   | `ph:chart-bar-duotone`      |
+| `solar:user-rounded-bold-duotone`   | `ph:user-circle-duotone`    |
+| `solar:hamburger-menu-linear`       | `ph:list`                   |
+| `solar:sun-bold-duotone`            | `ph:sun-duotone`            |
+| `solar:moon-bold-duotone`           | `ph:moon-duotone`           |
+| `solar:plain-bold`                  | `ph:paper-plane-right-fill` |
+| `solar:stars-bold-duotone`          | `ph:sparkle-duotone`        |
+| `solar:close-circle-linear`         | `ph:x-circle`               |
+
+
+### Files to Update
+
+- `src/components/layout/BottomNav.tsx`
+- `src/pages/HomePage.tsx`
+- `src/components/chat/ChatInput.tsx`
+- `src/pages/CellarPage.tsx`
+- `src/components/cellar/CellarAISidebar.tsx`
+
+---
+
+## 4. Calendar Flip Animation
+
+### Make Calendar Smaller
+
+- Reduce the calendar grid cell size by using smaller padding and font sizes
+- Add `max-w-md mx-auto` to constrain the calendar width on desktop
+
+### GSAP Flip Animation
+
+Replace the current horizontal slide (x-based) month transition with a vertical flip effect:
+
+**Next month (flip up):**
+
+```typescript
+gsap.to(monthRef.current, {
+  rotateX: -90,
+  opacity: 0,
+  duration: 0.3,
+  ease: "power2.in",
+  transformOrigin: "bottom center",
+  onComplete: () => {
+    setCurrentMonth(addMonths(currentMonth, 1));
+    gsap.fromTo(monthRef.current,
+      { rotateX: 90, opacity: 0, transformOrigin: "top center" },
+      { rotateX: 0, opacity: 1, duration: 0.3, ease: "power2.out" }
     );
-  }, []);
+  }
+});
+```
 
+**Previous month (flip down):**
+
+```typescript
+gsap.to(monthRef.current, {
+  rotateX: 90,
+  opacity: 0,
+  duration: 0.3,
+  ease: "power2.in",
+  transformOrigin: "top center",
+  onComplete: () => {
+    setCurrentMonth(subMonths(currentMonth, 1));
+    gsap.fromTo(monthRef.current,
+      { rotateX: -90, opacity: 0, transformOrigin: "bottom center" },
+      { rotateX: 0, opacity: 1, duration: 0.3, ease: "power2.out" }
+    );
+  }
+});
+```
+
+Add `perspective: 1000px` to the parent container for proper 3D perspective.
+
+---
+
+## 5. Fix Orchard Icon in Bottom Nav
+
+The current icon is `solar:tree-bold-duotone`. After the Phosphor migration, it becomes `ph:tree-duotone`. This should render correctly as Phosphor has a tree icon. If the current Solar one isn't loading, this migration will fix it.
+
+---
+
+## 6. Orchard -- Immersive Parallax Experience
+
+### **The 3D Orchard Architecture**
+
+**1. The 3D Scene (Back to Front):**
+
+- **The Skybox/Environment:** A 3D Background Gradient or a large Sphere wrapping the scene.
+- **The Forest (Deep Z-Space):** Instead of silhouettes, use **Instanced Meshes** of 3D trees scattered at various `z` depths (from -50 to -10).
+- **The Path (Ground Plane):** A 3D PlaneGeometry with a grass texture, stretching toward the horizon.
+- **Fruit Milestones:** 3D models (glTF) of fruits floating in space, positioned at specific "stations" along the Z-axis.
+
+**2. GSAP Camera Navigation:**  
+Instead of moving layers, we animate the **Camera's Z-position**. As the user scrolls, the camera "walks" through the trees.
+
+**javascript**
+
+```
+// GSAP Timeline to fly the camera through the orchard
+const tl = gsap.timeline({
+  scrollTrigger: {
+    trigger: "#viewport",
+    start: "top top",
+    end: "bottom bottom",
+    scrub: 1 // Smoothly tracks scroll position
+  }
+});
+
+// Move camera forward and tilt slightly as you walk
+tl.to(camera.position, { z: -100, ease: "none" }); 
+
+```
+
+Use code with caution.
+
+**3. Visual Components (The R3F Way):**  
+Replace your CSS `.tree-silhouette` with a reusable React component:
+
+**jsx**
+
+```
+function Tree({ position }) {
   return (
-    <main ref={ref} className={cn("min-h-screen pb-20 pt-6", className)} style={{ opacity: 0 }}>
-      <div className="container mx-auto max-w-lg px-4 md:max-w-2xl lg:max-w-4xl xl:max-w-6xl">
-        {children}
-      </div>
-    </main>
+    <mesh position={position}>
+      <coneGeometry args={[1, 3, 8]} /> {/* Simple 3D cone tree */}
+      <meshStandardMaterial color="#2d4f1e" />
+    </mesh>
   );
 }
 ```
 
-This removes the Framer Motion dependency from page containers while adding the luxury blur-in effect.
-
 ---
 
-## 2. Minimalist Splash/Loading Screen
-
-### Implementation
-Add a splash screen component that shows on first app load with a blurred fade-out.
-
-**New File: `src/components/layout/SplashScreen.tsx`**
-- Full-screen overlay with `bg-background`
-- Centered "Aramis" in `font-brand` (Cinzel), ultra-minimalist
-- On mount, wait 1.5s then GSAP animate out with blur + opacity
-- Uses a state flag in `App.tsx` to show/hide
-
-**`src/App.tsx` Changes:**
-- Add `showSplash` state (default `true`)
-- Render `SplashScreen` over everything
-- After splash animates out, set `showSplash = false`
-
----
-
-## 3. Cellar Nav Stays at Bottom
-
-### Current State
-`BottomNav.tsx` has special logic: `isCellar ? "top-0 pt-safe pt-2" : "bottom-4 pb-safe"`.
-
-### Changes
-**`src/components/layout/BottomNav.tsx`**
-- Remove the `isCellar` conditional logic entirely
-- Nav always stays at the bottom on all pages
-- Remove the top-nav GSAP animation variant
-- Keep tooltips and all existing hover effects
-
----
-
-## 4. Cellar Shows Journal Entries (Not Separate Thoughts)
+## 7. Cellar AI Shares Home Chat History
 
 ### Current Behavior
-The Cellar has its own `cellar_thoughts` table with separate CRUD. The user wants journal entries from the Write module to populate the Cellar instead.
+
+The CellarAISidebar has its own local `messages` state -- conversations are not persisted and don't connect to the Home chat system.
 
 ### Changes
 
-**`src/pages/CellarPage.tsx`**
-- Import `useJournalEntries` from `@/hooks/useJournal` instead of `useCellarThoughts`
-- Map journal entries into the masonry grid (each entry becomes a "thought card")
-- Show entry title, a content preview (first ~100 chars), mood emoji, and date
-- Remove the `AddThoughtDialog` FAB (entries are created in the Write module)
-- Keep the AI sidebar -- pass journal entries as context instead of cellar thoughts
+- **CellarAISidebar** will use the same `useChatConversations`, `useChatMessages`, `useCreateConversation`, `useAddMessage` hooks from `useChatHistory`
+- When the sidebar opens, it creates a new conversation (or continues the most recent one)
+- Messages sent from the Cellar sidebar are stored in the `chat_conversations`/`chat_messages` tables
+- These conversations appear in the Home module's ChatSidebar history
+- The system prompt is still specialized for journal exploration, but the conversation persists
 
-**`src/components/cellar/ThoughtCard.tsx`**
-- Update to accept a journal entry shape (title, content preview, mood, date)
-- Display as a card with title, snippet, mood indicator, and relative date
+### Implementation
 
-**`src/components/cellar/CellarAISidebar.tsx`**
-- Update the `buildSystemPrompt` to use journal entry content instead of cellar thoughts
-- Accept journal entries as the `thoughts` prop (update the interface)
+Replace local state in `CellarAISidebar` with the shared hooks:
 
-The `cellar_thoughts` table and hooks remain in the database but are no longer used by the UI. The `AddThoughtDialog` component is kept but not rendered.
-
----
-
-## 5. Desktop Responsiveness
-
-### Current Problem
-`PageContainer` constrains everything to `max-w-lg` (512px), making the app look tiny on desktop.
-
-### Changes
-
-**`src/components/layout/PageContainer.tsx`**
-- Change container from `max-w-lg` to responsive: `max-w-lg md:max-w-2xl lg:max-w-4xl xl:max-w-5xl`
-- This scales the content area from mobile (512px) to desktop (1024-1280px)
-
-**`src/pages/HomePage.tsx`**
-- Greeting section: center on mobile, left-align on desktop with larger text
-- Chat messages area: wider on desktop (max-w-2xl centered)
-- Header: add more horizontal padding on desktop
-
-**`src/pages/InsightsPage.tsx`**
-- Stats grid: `grid-cols-3` on mobile, `grid-cols-4` on desktop (featured card spans 2)
-- Side-by-side cards: remain 2-col but with more breathing room
-- Monthly progress: full-width with internal padding
-
-**`src/pages/OrchardPage.tsx`**
-- Fruit grid: `grid-cols-2 md:grid-cols-3 lg:grid-cols-4`
-- Hero section: larger text on desktop, more vertical padding
-- Progress card: `max-w-md` centered
-
-**`src/pages/CellarPage.tsx`**
-- Masonry grid: `column-count: 2` on mobile, `3` on tablet, `4` on desktop
-
-**`src/index.css` Masonry Update:**
-```css
-.masonry-grid { column-count: 2; column-gap: 1rem; }
-@media (min-width: 768px) { .masonry-grid { column-count: 3; } }
-@media (min-width: 1024px) { .masonry-grid { column-count: 4; } }
+```tsx
+const { data: conversations } = useChatConversations();
+const createConversation = useCreateConversation();
+const addMessage = useAddMessage();
+// ... use same pattern as HomePage
 ```
 
-**`src/pages/CalendarPage.tsx`**
-- Calendar grid scales naturally (7 columns)
-- Entry preview sits beside the calendar on desktop (side-by-side layout)
+---
 
-**`src/pages/ProfilePage.tsx`**
-- Profile card: `max-w-lg` centered on desktop (stays compact, doesn't stretch)
-- Settings links: `max-w-lg` centered
+## 8. Insights -- Line Graph and Bar Graph
 
-**`src/components/layout/BottomNav.tsx`**
-- Nav pill already floats centered -- works across viewports
-- Add slightly larger icon sizes on desktop: `lg:w-12 lg:h-12`
+### Using Recharts (already installed)
+
+**Line Graph: Mood Over Time**
+
+- X-axis: dates (last 30 days)
+- Y-axis: mood value (1-5 scale)
+- Line with primary color, area fill with gradient
+- Tooltip showing date and mood label
+
+**Bar Graph: Entries Per Week**
+
+- X-axis: week labels (last 8 weeks)
+- Y-axis: number of entries
+- Bars in primary color with rounded tops
+- Clean minimal styling matching the design system
+
+### Placement
+
+Replace the current "Mood Breakdown" and "This Week" cards with the two graphs side by side (or stacked on mobile).
 
 ---
 
-## 6. Iconify Icons
+## 9. Settings Module Expansion
 
-### Approach
-Install `@iconify/react` package to access premium icon sets (Material Symbols, Phosphor, Tabler, Solar, etc.).
+Add these new sections to `AppSettingsPage.tsx`:
 
-### Icon Replacements
+### New Features
 
-| Current (Lucide) | Replacement (Iconify) | Set |
-|---|---|---|
-| `Home` | `solar:home-2-bold-duotone` | Solar |
-| `PenLine` | `solar:pen-new-square-bold-duotone` | Solar |
-| `CalendarDays` | `solar:calendar-bold-duotone` | Solar |
-| `TreeDeciduous` | `solar:tree-bold-duotone` | Solar |
-| `Wine` | `solar:archive-bold-duotone` | Solar |
-| `LayoutGrid` | `solar:chart-square-bold-duotone` | Solar |
-| `User` | `solar:user-rounded-bold-duotone` | Solar |
-| `Sparkles` | `solar:stars-bold-duotone` | Solar |
-| `Send` | `solar:plain-bold` | Solar |
-| `Menu` | `solar:hamburger-menu-linear` | Solar |
-| `Moon` | `solar:moon-bold-duotone` | Solar |
-| `Sun` | `solar:sun-bold-duotone` | Solar |
+1. **Writing Goal** -- Daily word count target (e.g., 100, 250, 500 words) with a selector
+2. **Theme Accent Color** -- Choice between Gold (current), Rose, Sage, Ocean
+3. **Auto-Save Interval** -- Toggle between 1s, 2s, 3s auto-save delay
+4. **Data & Storage** -- Show storage usage estimate (count of entries, approximate size)
+5. **Journal Backup** -- Button to export all entries as JSON (functional)
+6. **Clear All Data** -- Danger zone button to delete all journal entries
+7. **Language** -- Placeholder for future i18n (display only, "English" selected)
 
-### Files to Update
-- `src/components/layout/BottomNav.tsx` -- all nav icons
-- `src/pages/HomePage.tsx` -- menu, theme toggle icons
-- `src/components/chat/ChatInput.tsx` -- send icon
-- `src/pages/CellarPage.tsx` -- AI button icon
-- `src/components/cellar/CellarAISidebar.tsx` -- close/send icons
+### Reorganization
 
-Lucide will remain available as a fallback for less critical icons (arrows, chevrons, etc.).
+Group settings into sections:
+
+- **Writing** (Font Size, Writing Goal, Auto-Save)
+- **Experience** (Sound, Haptics, AI Prompts)
+- **Notifications** (Toggle, Reminder Time)
+- **Data** (Backup, Storage, Clear Data)
+- **About** (Version, Support link)
 
 ---
 
-## 7. Notifications & Sound Verification
+## 10. Home Page -- Wireframe Match
 
-### Notifications
-The current `src/lib/notifications.ts` implementation is solid. Will enhance:
-- Use service worker registration (`navigator.serviceWorker.ready`) for notifications in PWA mode
-- Add `tag: 'aramis-reminder'` to prevent duplicate notifications
-- Verify `AppSettingsPage` toggle actually calls `requestNotificationPermission()`
+### Reference Image Analysis
 
-### Sound Effects
-The `src/lib/sounds.ts` uses Web Audio API with synthesized tones. Will verify:
-- `AudioContext` is resumed on first user gesture (mobile Safari requirement)
-- Add explicit `audioContext.resume()` call in sound initialization
-- Ensure `soundManager.isEnabled()` is exposed and togglable from settings
+The wireframe shows:
 
----
+1. **Left sidebar** -- hamburger + search at top, "New Chat" with icon, "Convos" collapsible section, conversation list
+2. **Top center** -- "43 *of* 365" (day counter, italic "of")
+3. **Top right** -- Theme toggle (circle)
+4. **Center** -- Large "Hey, Charis." greeting in serif, "How Was Your Day?" subtitle
+5. **Below greeting** -- Large rounded pill input
+6. **Bottom** -- 5-icon floating pill nav (Home, Write, Orchard, Grid/Insights, Profile) with date to the right
 
-## 8. Tooltip & Micro-Interaction Polish
+### Current State vs Wireframe
 
-### Already Working
-- Bottom nav tooltips via Radix Tooltip (verified in code)
-- Hover scale on nav icons: `hover:scale-110`
-- Glass card hover lift: `translateY(-2px)`
-- Button luxury hover: `translateY(-1px) scale(1.02)`
+The current implementation already matches fairly well. Key adjustments:
 
-### Enhancements
-- Ensure tooltip `side` is always `"top"` (remove the Cellar-specific "bottom" variant since nav stays at bottom now)
-- Add `active:scale-95` on all interactive buttons for press feedback
-- Ensure thought cards in masonry have the hover lift effect
-- Profile settings links: add hover border glow
+- **Bottom nav**: Reduce to 5 icons (remove Calendar and Cellar from the main nav, keep them accessible via sidebar or other means). Per the wireframe: Home, Write, Orchard, Insights, Profile.
+
+Actually, looking more carefully, the wireframe shows exactly 5 icons. However, the user has also asked for Calendar, Cellar, etc. So the bottom nav should keep all 7 icons as currently implemented -- the wireframe is a design direction, not a strict icon count. The layout arrangement (sidebar left, counter top-center, toggle top-right, greeting center, input below) is already implemented.
+
+### Adjustments Needed
+
+- The current layout matches the wireframe well. Minor tweaks:
+  - Ensure the greeting is vertically centered in available space (already using `flex-1 flex items-center justify-center`)
+  - Ensure the pill input has generous padding and rounded-full shape (already done)
+  - Sidebar layout matches (already has hamburger, search, New Chat, Convos sections)
+
+No major structural changes needed for the Home page -- it already follows the wireframe.
 
 ---
 
 ## Files Summary
 
 ### New Files
-| File | Purpose |
-|------|---------|
-| `src/components/layout/SplashScreen.tsx` | Minimalist Aramis logo splash on first load |
+
+None -- all changes are modifications to existing files.
 
 ### Modified Files
-| File | Changes |
-|------|---------|
-| `src/components/layout/PageContainer.tsx` | GSAP blur transition, responsive max-widths |
-| `src/components/layout/BottomNav.tsx` | Remove top-nav variant, keep at bottom always, Iconify icons |
-| `src/pages/CellarPage.tsx` | Use journal entries instead of cellar_thoughts, remove FAB |
-| `src/components/cellar/ThoughtCard.tsx` | Accept journal entry shape |
-| `src/components/cellar/CellarAISidebar.tsx` | Use journal entries as context |
-| `src/pages/HomePage.tsx` | Iconify icons, desktop responsive layout |
-| `src/pages/InsightsPage.tsx` | Desktop grid breakpoints |
-| `src/pages/OrchardPage.tsx` | Desktop grid breakpoints |
-| `src/pages/CalendarPage.tsx` | Side-by-side layout on desktop |
-| `src/pages/ProfilePage.tsx` | Centered max-w on desktop |
-| `src/components/chat/ChatInput.tsx` | Iconify send icon |
-| `src/index.css` | Masonry breakpoints for desktop |
-| `src/App.tsx` | Add splash screen logic |
-| `src/lib/notifications.ts` | Service worker notification, tag |
-| `src/lib/sounds.ts` | AudioContext resume on gesture |
-| `package.json` | Add `@iconify/react` dependency |
+
+
+| File                                        | Changes                                                                              |
+| ------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `src/pages/WritePage.tsx`                   | Remove mood/today/save, add auto-save, formatting toolbar, AI summary, entry sidebar |
+| `src/components/layout/BottomNav.tsx`       | Remove date, switch to Phosphor icons                                                |
+| `src/pages/HomePage.tsx`                    | Switch to Phosphor icons                                                             |
+| `src/components/chat/ChatInput.tsx`         | Switch to Phosphor icons                                                             |
+| `src/pages/CellarPage.tsx`                  | Switch to Phosphor icons                                                             |
+| `src/components/cellar/CellarAISidebar.tsx` | Switch to Phosphor icons, integrate shared chat history                              |
+| `src/pages/CalendarPage.tsx`                | Smaller grid, GSAP flip animation with perspective                                   |
+| `src/pages/OrchardPage.tsx`                 | Full immersive parallax rewrite with layered depth                                   |
+| `src/pages/InsightsPage.tsx`                | Add Recharts line and bar graphs                                                     |
+| `src/pages/AppSettingsPage.tsx`             | Expand with new settings sections                                                    |
+| `src/components/chat/ChatSidebar.tsx`       | Switch Lucide icons to Phosphor where applicable                                     |
+
 
 ### No Database Changes Required
-The cellar_thoughts table stays in the database but the UI will read from journal_entries instead.
+
+---
+
+## Technical Details
+
+### Auto-Save Debounce Pattern
+
+```typescript
+const saveTimerRef = useRef<NodeJS.Timeout>();
+const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+
+useEffect(() => {
+  if (!content.trim()) return;
+  setSaveStatus("idle");
+  
+  clearTimeout(saveTimerRef.current);
+  saveTimerRef.current = setTimeout(async () => {
+    setSaveStatus("saving");
+    // save logic...
+    setSaveStatus("saved");
+  }, 1500);
+
+  return () => clearTimeout(saveTimerRef.current);
+}, [content, title]);
+```
+
+### Formatting Toolbar -- Markdown Insertion
+
+```typescript
+function insertFormatting(textarea: HTMLTextAreaElement, prefix: string, suffix: string = "") {
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selected = textarea.value.substring(start, end);
+  const replacement = `${prefix}${selected}${suffix}`;
+  // Update content state with replacement
+}
+```
+
+### Recharts Minimal Styling
+
+```tsx
+<LineChart data={moodData}>
+  <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+  <YAxis domain={[1, 5]} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+  <Line type="monotone" dataKey="mood" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+</LineChart>
+```
 
 ---
 
 ## Implementation Order
 
-1. Install `@iconify/react` dependency
-2. Create `SplashScreen.tsx` and integrate into `App.tsx`
-3. Update `PageContainer.tsx` (GSAP blur + responsive widths)
-4. Fix `BottomNav.tsx` (remove top-nav, add Iconify icons)
-5. Refactor `CellarPage.tsx` to use journal entries
-6. Update all page layouts for desktop responsiveness
-7. Swap remaining icons to Iconify across pages
-8. Polish notifications and sound effects
-9. Test across mobile and desktop viewports
-
+1. Switch all icons to Phosphor (across all files)
+2. Remove date from bottom nav
+3. Write module overhaul (removals, auto-save, toolbar, AI summary, sidebar)
+4. Calendar flip animation
+5. Orchard immersive parallax
+6. Cellar AI unification with shared chat history
+7. Insights line + bar graphs
+8. Settings expansion
+9. Testing across all modules

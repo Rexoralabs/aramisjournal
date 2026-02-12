@@ -135,7 +135,7 @@ const HomePage = () => {
             }}
             className="p-2 rounded-lg hover:bg-muted transition-colors touch-target"
           >
-            <Icon icon="solar:hamburger-menu-linear" className="h-5 w-5 text-muted-foreground" />
+            <Icon icon="ph:list" className="h-5 w-5 text-muted-foreground" />
           </button>
 
           <div className="text-center">
@@ -152,9 +152,9 @@ const HomePage = () => {
             className="p-2 rounded-lg hover:bg-muted transition-colors touch-target"
           >
             {theme === "dark" ? (
-              <Icon icon="solar:sun-bold-duotone" className="h-5 w-5 text-muted-foreground" />
+              <Icon icon="ph:sun-duotone" className="h-5 w-5 text-muted-foreground" />
             ) : (
-              <Icon icon="solar:moon-bold-duotone" className="h-5 w-5 text-muted-foreground" />
+              <Icon icon="ph:moon-duotone" className="h-5 w-5 text-muted-foreground" />
             )}
           </button>
         </div>

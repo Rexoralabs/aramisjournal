@@ -1,20 +1,19 @@
 import { Link, useLocation } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import { useRef, useLayoutEffect } from "react";
-import { format } from "date-fns";
 import gsap from "gsap";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 const navItems = [
-  { path: "/", icon: "solar:home-2-bold-duotone", label: "Home" },
-  { path: "/write", icon: "solar:pen-new-square-bold-duotone", label: "Write" },
-  { path: "/calendar", icon: "solar:calendar-bold-duotone", label: "Calendar" },
-  { path: "/orchard", icon: "solar:tree-bold-duotone", label: "Orchard" },
-  { path: "/cellar", icon: "solar:archive-bold-duotone", label: "Cellar" },
-  { path: "/insights", icon: "solar:chart-square-bold-duotone", label: "Insights" },
-  { path: "/profile", icon: "solar:user-rounded-bold-duotone", label: "Profile" },
+  { path: "/", icon: "ph:house-duotone", label: "Home" },
+  { path: "/write", icon: "ph:pencil-simple-duotone", label: "Write" },
+  { path: "/calendar", icon: "ph:calendar-duotone", label: "Calendar" },
+  { path: "/orchard", icon: "ph:tree-duotone", label: "Orchard" },
+  { path: "/cellar", icon: "ph:vault-duotone", label: "Cellar" },
+  { path: "/insights", icon: "ph:chart-bar-duotone", label: "Insights" },
+  { path: "/profile", icon: "ph:user-circle-duotone", label: "Profile" },
 ];
 
 export function BottomNav() {
@@ -73,10 +72,6 @@ export function BottomNav() {
             );
           })}
         </div>
-
-        <span className="absolute right-4 sm:right-6 bottom-1 text-xs font-ui text-muted-foreground">
-          {format(new Date(), "MM.dd.yy")}
-        </span>
       </div>
     </nav>
   );

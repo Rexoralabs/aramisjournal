@@ -1,13 +1,25 @@
 import { useState, useRef, useLayoutEffect, useEffect } from "react";
-import { ArrowLeft, Bell, Clock, Smile, Sparkles, Info, Volume2, Vibrate } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { useNavigate } from "react-router-dom";
 import gsap from "gsap";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { useUserProfile, useUpdateProfile } from "@/hooks/useProfile";
+import { useJournalEntries, useDeleteEntry } from "@/hooks/useJournal";
 import { toast } from "sonner";
 import { haptic, setHapticsEnabled, isHapticsEnabled } from "@/lib/haptics";
 import { soundManager } from "@/lib/sounds";
 import { requestNotificationPermission, scheduleDailyReminder, stopDailyReminder } from "@/lib/notifications";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const fontSizeOptions = [
   { value: "small", label: "Small" },
@@ -15,35 +27,41 @@ const fontSizeOptions = [
   { value: "large", label: "Large" },
 ];
 
-const defaultMoodOptions = [
-  { value: "amazing", emoji: "✨", label: "Amazing" },
-  { value: "good", emoji: "😊", label: "Good" },
-  { value: "okay", emoji: "😐", label: "Okay" },
+const writingGoalOptions = [
+  { value: 100, label: "100" },
+  { value: 250, label: "250" },
+  { value: 500, label: "500" },
+];
+
+const accentColors = [
+  { value: "gold", label: "Gold", color: "hsl(43 74% 49%)" },
+  { value: "rose", label: "Rose", color: "hsl(346 77% 49%)" },
+  { value: "sage", label: "Sage", color: "hsl(143 40% 45%)" },
+  { value: "ocean", label: "Ocean", color: "hsl(210 70% 50%)" },
 ];
 
 const AppSettingsPage = () => {
   const navigate = useNavigate();
   const { data: profile } = useUserProfile();
   const updateProfile = useUpdateProfile();
+  const { data: entries = [] } = useJournalEntries();
+  const deleteEntry = useDeleteEntry();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [notifications, setNotifications] = useState(profile?.notification_enabled ?? true);
   const [fontSize, setFontSize] = useState(profile?.font_size_preference || "medium");
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [hapticsEnabled, setHapticsEnabledState] = useState(true);
+  const [writingGoal, setWritingGoal] = useState(250);
+  const [selectedAccent, setSelectedAccent] = useState("gold");
 
   useLayoutEffect(() => {
     if (containerRef.current) {
-      gsap.fromTo(
-        containerRef.current,
-        { opacity: 0 },
-        { opacity: 1, duration: 0.4, ease: "power2.out" }
-      );
+      gsap.fromTo(containerRef.current, { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" });
     }
   }, []);
 
   useEffect(() => {
-    // Sync with actual state
     setHapticsEnabledState(isHapticsEnabled());
     setSoundEnabled(soundManager.isEnabled());
   }, []);
@@ -51,249 +69,254 @@ const AppSettingsPage = () => {
   const handleNotificationToggle = async () => {
     const newValue = !notifications;
     haptic('selection');
-    
     if (newValue) {
       const granted = await requestNotificationPermission();
-      if (!granted) {
-        toast.error("Notification permission denied. Please enable in browser settings.");
-        return;
-      }
+      if (!granted) { toast.error("Permission denied"); return; }
       scheduleDailyReminder(21);
-      toast.success("Daily reminders enabled at 9 PM");
+      toast.success("Daily reminders enabled");
     } else {
       stopDailyReminder();
       toast.success("Notifications disabled");
     }
-    
     setNotifications(newValue);
-    try {
-      await updateProfile.mutateAsync({ notification_enabled: newValue });
-    } catch (error) {
-      setNotifications(!newValue);
-    }
+    try { await updateProfile.mutateAsync({ notification_enabled: newValue }); } catch { setNotifications(!newValue); }
   };
 
   const handleFontSizeChange = async (size: string) => {
     setFontSize(size);
     haptic('light');
-    try {
-      await updateProfile.mutateAsync({ font_size_preference: size });
-    } catch (error) {
-      // Revert on error
-    }
+    try { await updateProfile.mutateAsync({ font_size_preference: size }); } catch {}
   };
 
   const handleSoundToggle = () => {
     const newValue = !soundEnabled;
     setSoundEnabled(newValue);
     soundManager.toggle(newValue);
-    if (newValue) {
-      soundManager.play('click');
-    }
+    if (newValue) soundManager.play('click');
     haptic('selection');
-    toast.success(`Sound effects ${newValue ? "enabled" : "disabled"}`);
   };
 
   const handleHapticsToggle = () => {
     const newValue = !hapticsEnabled;
     setHapticsEnabledState(newValue);
     setHapticsEnabled(newValue);
-    if (newValue) {
-      haptic('success');
-    }
-    toast.success(`Haptic feedback ${newValue ? "enabled" : "disabled"}`);
+    if (newValue) haptic('success');
   };
+
+  const handleExportData = () => {
+    const blob = new Blob([JSON.stringify(entries, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `aramis-journal-${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Journal exported successfully");
+  };
+
+  const handleClearAllData = async () => {
+    for (const entry of entries) {
+      await deleteEntry.mutateAsync(entry.id);
+    }
+    toast.success("All entries deleted");
+  };
+
+  const estimatedSize = entries.reduce((acc, e) => acc + (e.content?.length || 0), 0);
+  const sizeKB = Math.round(estimatedSize / 1024);
+
+  const Toggle = ({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) => (
+    <button
+      onClick={onToggle}
+      className={`relative h-6 w-11 rounded-full transition-colors touch-target ${enabled ? "bg-primary" : "bg-muted"}`}
+    >
+      <div className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-6" : "translate-x-1"}`} />
+    </button>
+  );
 
   return (
     <PageContainer>
-      <div ref={containerRef} className="space-y-6 pb-8">
+      <div ref={containerRef} className="space-y-6 pb-8 max-w-lg mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 rounded-lg hover:bg-muted transition-colors touch-target"
-          >
-            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+          <button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-muted transition-colors">
+            <Icon icon="ph:arrow-left" className="h-5 w-5 text-muted-foreground" />
           </button>
-          <h1 className="text-2xl sm:text-3xl font-serif text-foreground">App Settings</h1>
+          <h1 className="text-2xl sm:text-3xl font-serif text-foreground">Settings</h1>
         </div>
 
-        {/* Sound Effects */}
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-muted">
-                <Volume2 className="h-5 w-5 text-muted-foreground" />
+        {/* Writing Section */}
+        <div className="space-y-1">
+          <h2 className="text-xs font-ui text-muted-foreground uppercase tracking-wider px-1">Writing</h2>
+          <div className="space-y-3">
+            {/* Font Size */}
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-muted"><span className="text-lg">Aa</span></div>
+                <div>
+                  <p className="font-ui text-foreground">Font Size</p>
+                  <p className="text-xs text-muted-foreground">Adjust text size</p>
+                </div>
               </div>
-              <div>
-                <p className="font-ui text-foreground">Sound Effects</p>
-                <p className="text-xs text-muted-foreground">Subtle audio feedback</p>
+              <div className="flex gap-2">
+                {fontSizeOptions.map((o) => (
+                  <button key={o.value} onClick={() => handleFontSizeChange(o.value)}
+                    className={`flex-1 py-2 px-4 rounded-lg font-ui text-sm transition-all ${fontSize === o.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    {o.label}
+                  </button>
+                ))}
               </div>
             </div>
-            <button
-              onClick={handleSoundToggle}
-              className={`relative h-6 w-11 rounded-full transition-colors touch-target ${
-                soundEnabled ? "bg-primary" : "bg-muted"
-              }`}
-            >
-              <div
-                className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                  soundEnabled ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
+
+            {/* Writing Goal */}
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:target-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+                <div>
+                  <p className="font-ui text-foreground">Daily Writing Goal</p>
+                  <p className="text-xs text-muted-foreground">Words per day target</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {writingGoalOptions.map((o) => (
+                  <button key={o.value} onClick={() => { setWritingGoal(o.value); haptic("light"); }}
+                    className={`flex-1 py-2 px-4 rounded-lg font-ui text-sm transition-all ${writingGoal === o.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Haptic Feedback */}
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-muted">
-                <Vibrate className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-ui text-foreground">Haptic Feedback</p>
-                <p className="text-xs text-muted-foreground">Vibration on interactions</p>
+        {/* Experience Section */}
+        <div className="space-y-1">
+          <h2 className="text-xs font-ui text-muted-foreground uppercase tracking-wider px-1">Experience</h2>
+          <div className="space-y-3">
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:speaker-high-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+                  <div><p className="font-ui text-foreground">Sound Effects</p><p className="text-xs text-muted-foreground">Subtle audio feedback</p></div>
+                </div>
+                <Toggle enabled={soundEnabled} onToggle={handleSoundToggle} />
               </div>
             </div>
-            <button
-              onClick={handleHapticsToggle}
-              className={`relative h-6 w-11 rounded-full transition-colors touch-target ${
-                hapticsEnabled ? "bg-primary" : "bg-muted"
-              }`}
-            >
-              <div
-                className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                  hapticsEnabled ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:vibrate-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+                  <div><p className="font-ui text-foreground">Haptic Feedback</p><p className="text-xs text-muted-foreground">Vibration on interactions</p></div>
+                </div>
+                <Toggle enabled={hapticsEnabled} onToggle={handleHapticsToggle} />
+              </div>
+            </div>
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:sparkle-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+                  <div><p className="font-ui text-foreground">AI Prompts</p><p className="text-xs text-muted-foreground">Daily writing suggestions</p></div>
+                </div>
+                <button className="relative h-6 w-11 rounded-full bg-primary touch-target">
+                  <div className="absolute top-1 translate-x-6 h-4 w-4 rounded-full bg-white shadow-sm" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Notifications */}
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-muted">
-                <Bell className="h-5 w-5 text-muted-foreground" />
+        {/* Notifications Section */}
+        <div className="space-y-1">
+          <h2 className="text-xs font-ui text-muted-foreground uppercase tracking-wider px-1">Notifications</h2>
+          <div className="space-y-3">
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:bell-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+                  <div><p className="font-ui text-foreground">Notifications</p><p className="text-xs text-muted-foreground">Daily reminders to journal</p></div>
+                </div>
+                <Toggle enabled={notifications} onToggle={handleNotificationToggle} />
               </div>
-              <div>
-                <p className="font-ui text-foreground">Notifications</p>
-                <p className="text-xs text-muted-foreground">Daily reminders to journal</p>
+            </div>
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:clock-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+                <div><p className="font-ui text-foreground">Daily Reminder</p><p className="text-xs text-muted-foreground">Set your preferred time</p></div>
               </div>
-            </div>
-            <button
-              onClick={handleNotificationToggle}
-              className={`relative h-6 w-11 rounded-full transition-colors touch-target ${
-                notifications ? "bg-primary" : "bg-muted"
-              }`}
-            >
-              <div
-                className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                  notifications ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-
-        {/* Reminder Time */}
-        <div className="glass-card p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-lg bg-muted">
-              <Clock className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="font-ui text-foreground">Daily Reminder</p>
-              <p className="text-xs text-muted-foreground">Set your preferred time</p>
-            </div>
-          </div>
-          <button className="w-full py-2 px-4 rounded-lg bg-muted text-muted-foreground font-ui text-sm touch-target">
-            9:00 PM (Coming soon)
-          </button>
-        </div>
-
-        {/* Font Size */}
-        <div className="glass-card p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-lg bg-muted">
-              <span className="text-lg">Aa</span>
-            </div>
-            <div>
-              <p className="font-ui text-foreground">Font Size</p>
-              <p className="text-xs text-muted-foreground">Adjust text size</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            {fontSizeOptions.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => handleFontSizeChange(option.value)}
-                className={`flex-1 py-2 px-4 rounded-lg font-ui text-sm transition-all touch-target ${
-                  fontSize === option.value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-              >
-                {option.label}
+              <button className="w-full mt-3 py-2 px-4 rounded-lg bg-muted text-muted-foreground font-ui text-sm">
+                9:00 PM (Coming soon)
               </button>
-            ))}
+            </div>
           </div>
         </div>
 
-        {/* Default Mood */}
-        <div className="glass-card p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-lg bg-muted">
-              <Smile className="h-5 w-5 text-muted-foreground" />
+        {/* Appearance Section */}
+        <div className="space-y-1">
+          <h2 className="text-xs font-ui text-muted-foreground uppercase tracking-wider px-1">Appearance</h2>
+          <div className="glass-card p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:palette-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+              <div><p className="font-ui text-foreground">Accent Color</p><p className="text-xs text-muted-foreground">Personalize your theme</p></div>
             </div>
-            <div>
-              <p className="font-ui text-foreground">Default Mood</p>
-              <p className="text-xs text-muted-foreground">Pre-select when writing</p>
+            <div className="flex gap-3">
+              {accentColors.map((c) => (
+                <button key={c.value} onClick={() => { setSelectedAccent(c.value); haptic("light"); }}
+                  className={`flex flex-col items-center gap-1.5 p-2 rounded-lg transition-all ${selectedAccent === c.value ? "bg-muted" : ""}`}>
+                  <div className="w-8 h-8 rounded-full border-2 transition-all" style={{ backgroundColor: c.color, borderColor: selectedAccent === c.value ? c.color : "transparent" }} />
+                  <span className="text-[10px] font-ui text-muted-foreground">{c.label}</span>
+                </button>
+              ))}
             </div>
           </div>
-          <div className="flex gap-2">
-            {defaultMoodOptions.map((option) => (
-              <button
-                key={option.value}
-                className="flex-1 py-2 px-3 rounded-lg bg-muted text-muted-foreground font-ui text-sm flex items-center justify-center gap-1 touch-target"
-              >
-                <span>{option.emoji}</span>
-                <span className="hidden sm:inline">{option.label}</span>
+        </div>
+
+        {/* Data Section */}
+        <div className="space-y-1">
+          <h2 className="text-xs font-ui text-muted-foreground uppercase tracking-wider px-1">Data</h2>
+          <div className="space-y-3">
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:database-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+                  <div><p className="font-ui text-foreground">Storage</p><p className="text-xs text-muted-foreground">{entries.length} entries · ~{sizeKB} KB</p></div>
+                </div>
+              </div>
+            </div>
+            <div className="glass-card p-5">
+              <button onClick={handleExportData} className="w-full flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:download-simple-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+                <div className="text-left"><p className="font-ui text-foreground">Export Journal</p><p className="text-xs text-muted-foreground">Download as JSON</p></div>
               </button>
-            ))}
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <div className="glass-card p-5 border-destructive/20 cursor-pointer hover:bg-destructive/5 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-destructive/10"><Icon icon="ph:trash-duotone" className="h-5 w-5 text-destructive" /></div>
+                    <div><p className="font-ui text-destructive">Clear All Data</p><p className="text-xs text-muted-foreground">Delete all journal entries</p></div>
+                  </div>
+                </div>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear All Data</AlertDialogTitle>
+                  <AlertDialogDescription>This will permanently delete all {entries.length} journal entries. This cannot be undone.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearAllData} className="bg-destructive text-destructive-foreground">Delete All</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
 
-        {/* AI Prompts */}
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between">
+        {/* About Section */}
+        <div className="space-y-1">
+          <h2 className="text-xs font-ui text-muted-foreground uppercase tracking-wider px-1">About</h2>
+          <div className="glass-card p-5">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-muted">
-                <Sparkles className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-ui text-foreground">AI Prompts</p>
-                <p className="text-xs text-muted-foreground">Show daily writing suggestions</p>
-              </div>
-            </div>
-            <button className="relative h-6 w-11 rounded-full bg-primary touch-target">
-              <div className="absolute top-1 translate-x-6 h-4 w-4 rounded-full bg-white shadow-sm" />
-            </button>
-          </div>
-        </div>
-
-        {/* About */}
-        <div className="glass-card p-5">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-muted">
-              <Info className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div className="flex-1">
-              <p className="font-ui text-foreground">About Aramis</p>
-              <p className="text-xs text-muted-foreground">Version 1.0.0</p>
+              <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:info-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+              <div className="flex-1"><p className="font-ui text-foreground">Aramis</p><p className="text-xs text-muted-foreground">Version 1.0.0</p></div>
             </div>
           </div>
         </div>

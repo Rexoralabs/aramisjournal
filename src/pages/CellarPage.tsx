@@ -35,7 +35,7 @@ const CellarPage = () => {
             }}
             className="h-10 w-10 rounded-2xl bg-primary/15 flex items-center justify-center hover:bg-primary/25 transition-colors touch-target"
           >
-            <Icon icon="solar:stars-bold-duotone" className="h-5 w-5 text-primary" />
+            <Icon icon="ph:sparkle-duotone" className="h-5 w-5 text-primary" />
           </button>
         </div>
 

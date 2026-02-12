@@ -1,12 +1,16 @@
 import { useState, useRef, useLayoutEffect } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, subDays } from "date-fns";
-import { Flame, FileText, TrendingUp } from "lucide-react";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, subWeeks, startOfWeek, endOfWeek } from "date-fns";
+import { Icon } from "@iconify/react";
 import gsap from "gsap";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { useJournalEntries } from "@/hooks/useJournal";
 import { useUserStreak } from "@/hooks/useStreaks";
 
 type TimeFilter = "week" | "month" | "all";
+
+const moodValues: Record<string, number> = { amazing: 5, good: 4, okay: 3, down: 2, rough: 1 };
+const moodEmoji: Record<string, string> = { amazing: "✨", good: "😊", okay: "😐", down: "😔", rough: "😢" };
 
 const InsightsPage = () => {
   const [filter, setFilter] = useState<TimeFilter>("month");
@@ -20,7 +24,6 @@ const InsightsPage = () => {
   const currentStreak = streakData?.current_streak || 0;
   const longestStreak = streakData?.longest_streak || 0;
 
-  // Filter entries by time
   const now = new Date();
   const filteredEntries = entries.filter((e) => {
     if (filter === "all") return true;
@@ -30,18 +33,10 @@ const InsightsPage = () => {
     return true;
   });
 
-  // Mood stats
-  const moodValues: Record<string, number> = { amazing: 5, good: 4, okay: 3, down: 2, rough: 1 };
-  const moodEmoji: Record<string, string> = { amazing: "✨", good: "😊", okay: "😐", down: "😔", rough: "😢" };
   const entriesWithMood = filteredEntries.filter((e) => e.mood);
   const avgMood = entriesWithMood.length > 0
     ? entriesWithMood.reduce((s, e) => s + (moodValues[e.mood!] || 0), 0) / entriesWithMood.length
     : 0;
-
-  const moodCounts = filteredEntries.reduce((acc, e) => {
-    if (e.mood) acc[e.mood] = (acc[e.mood] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
 
   // Monthly writing days
   const monthStart = startOfMonth(now);
@@ -51,10 +46,26 @@ const InsightsPage = () => {
   const writingDaysThisMonth = daysInMonth.filter((d) => entryDates.has(format(d, "yyyy-MM-dd"))).length;
   const monthPercent = Math.round((writingDaysThisMonth / daysInMonth.length) * 100);
 
-  // Weekly heatmap (last 7 days)
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = subDays(now, 6 - i);
-    return { day: format(d, "EEE"), date: format(d, "yyyy-MM-dd"), hasEntry: entryDates.has(format(d, "yyyy-MM-dd")) };
+  // Mood over time data (last 30 days)
+  const moodLineData = Array.from({ length: 30 }, (_, i) => {
+    const d = subDays(now, 29 - i);
+    const dateStr = format(d, "yyyy-MM-dd");
+    const entry = entries.find(e => e.entry_date === dateStr);
+    return {
+      date: format(d, "MMM d"),
+      mood: entry?.mood ? moodValues[entry.mood] : null,
+    };
+  }).filter(d => d.mood !== null);
+
+  // Entries per week data (last 8 weeks)
+  const barData = Array.from({ length: 8 }, (_, i) => {
+    const weekStart = startOfWeek(subWeeks(now, 7 - i));
+    const weekEnd = endOfWeek(subWeeks(now, 7 - i));
+    const count = entries.filter(e => {
+      const d = new Date(e.entry_date);
+      return d >= weekStart && d <= weekEnd;
+    }).length;
+    return { week: format(weekStart, "MMM d"), entries: count };
   });
 
   useLayoutEffect(() => {
@@ -71,7 +82,6 @@ const InsightsPage = () => {
   return (
     <PageContainer>
       <div ref={containerRef} className="space-y-5 pb-8">
-        {/* Header */}
         <div>
           <h1 className="text-3xl font-serif text-foreground">Your Journey</h1>
           <p className="text-muted-foreground font-ui text-sm mt-1">Patterns in your reflection</p>
@@ -93,22 +103,19 @@ const InsightsPage = () => {
         </div>
 
         <div ref={cardsRef} className="space-y-4">
-          {/* Stats row - featured + stacked */}
+          {/* Stats row */}
           <div className="grid grid-cols-3 gap-3">
-            {/* Featured streak card */}
             <div className="insight-card col-span-2 glass-card p-5">
               <div className="flex items-center gap-2 mb-1">
-                <Flame className="h-4 w-4 text-primary" />
+                <Icon icon="ph:flame-duotone" className="h-4 w-4 text-primary" />
                 <span className="text-xs font-ui text-muted-foreground">Current Streak</span>
               </div>
               <p className="text-4xl font-serif text-foreground">{currentStreak}</p>
               <p className="text-xs font-ui text-muted-foreground mt-1">Best: {longestStreak} days</p>
             </div>
-
-            {/* Stacked right column */}
             <div className="flex flex-col gap-3">
               <div className="insight-card glass-card p-4 text-center flex-1 flex flex-col justify-center">
-                <FileText className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
+                <Icon icon="ph:file-text-duotone" className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
                 <p className="text-2xl font-serif text-foreground">{totalEntries}</p>
                 <p className="text-[10px] font-ui text-muted-foreground">Entries</p>
               </div>
@@ -119,56 +126,53 @@ const InsightsPage = () => {
             </div>
           </div>
 
-          {/* Two side-by-side sections */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* Mood distribution */}
-            <div className="insight-card glass-card p-4">
-              <h3 className="font-ui text-xs text-muted-foreground mb-3">Mood Breakdown</h3>
-              {Object.keys(moodCounts).length > 0 ? (
-                <div className="space-y-2">
-                  {Object.entries(moodCounts)
-                    .sort(([, a], [, b]) => b - a)
-                    .slice(0, 4)
-                    .map(([mood, count]) => (
-                      <div key={mood} className="flex items-center gap-2">
-                        <span className="text-sm">{moodEmoji[mood]}</span>
-                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full bg-primary rounded-full" style={{ width: `${(count / entriesWithMood.length) * 100}%` }} />
-                        </div>
-                        <span className="text-[10px] font-ui text-muted-foreground">{count}</span>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">No mood data yet</p>
-              )}
-            </div>
+          {/* Line Graph: Mood Over Time */}
+          <div className="insight-card glass-card p-5">
+            <h3 className="font-ui text-xs text-muted-foreground mb-4">Mood Over Time</h3>
+            {moodLineData.length > 1 ? (
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart data={moodLineData}>
+                  <defs>
+                    <linearGradient id="moodGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[1, 5]} tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={20} />
+                  <Tooltip
+                    contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }}
+                    labelStyle={{ color: "hsl(var(--foreground))" }}
+                  />
+                  <Area type="monotone" dataKey="mood" stroke="hsl(var(--primary))" fill="url(#moodGrad)" strokeWidth={2} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-8">Not enough mood data yet</p>
+            )}
+          </div>
 
-            {/* Weekly heatmap */}
-            <div className="insight-card glass-card p-4">
-              <h3 className="font-ui text-xs text-muted-foreground mb-3">This Week</h3>
-              <div className="grid grid-cols-7 gap-1">
-                {weekDays.map((d) => (
-                  <div key={d.date} className="flex flex-col items-center gap-1">
-                    <div
-                      className={`h-6 w-6 rounded-lg flex items-center justify-center ${
-                        d.hasEntry ? "bg-primary/20" : "bg-muted"
-                      }`}
-                    >
-                      {d.hasEntry && <div className="h-2 w-2 rounded-full bg-primary" />}
-                    </div>
-                    <span className="text-[9px] font-ui text-muted-foreground">{d.day.charAt(0)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {/* Bar Graph: Entries Per Week */}
+          <div className="insight-card glass-card p-5">
+            <h3 className="font-ui text-xs text-muted-foreground mb-4">Entries Per Week</h3>
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={barData}>
+                <XAxis dataKey="week" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={20} />
+                <Tooltip
+                  contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }}
+                  labelStyle={{ color: "hsl(var(--foreground))" }}
+                />
+                <Bar dataKey="entries" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
 
           {/* Monthly progress */}
           <div className="insight-card glass-card p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-primary" />
+                <Icon icon="ph:trend-up-duotone" className="h-4 w-4 text-primary" />
                 <span className="font-ui text-xs text-muted-foreground">{format(now, "MMMM")}</span>
               </div>
               <span className="text-xs font-ui text-muted-foreground">{monthPercent}%</span>

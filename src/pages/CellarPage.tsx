@@ -43,7 +43,7 @@ const CellarPage = () => {
         {entries.length === 0 ? (
           <div className="text-center py-20">
             <p className="font-emphasis text-lg text-muted-foreground">Your cellar is empty.</p>
-            <p className="text-sm text-muted-foreground font-ui mt-2">Start writing in the Write module to see your entries here.</p>
+            <p className="text-sm text-muted-foreground font-ui mt-2">Start writing in the Compose module to see your entries here.</p>
           </div>
         ) : (
           <div className="masonry-grid">

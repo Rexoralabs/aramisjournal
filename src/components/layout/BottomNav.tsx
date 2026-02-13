@@ -8,9 +8,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 
 const navItems = [
   { path: "/", icon: "ph:house-duotone", label: "Home" },
-  { path: "/write", icon: "ph:pencil-simple-duotone", label: "Write" },
+  { path: "/compose", icon: "ph:pencil-simple-duotone", label: "Compose" },
   { path: "/calendar", icon: "ph:calendar-duotone", label: "Calendar" },
-  { path: "/orchard", icon: "ph:tree-duotone", label: "Orchard" },
+  { path: "/focus", icon: "ph:timer-duotone", label: "Focus" },
   { path: "/cellar", icon: "ph:vault-duotone", label: "Cellar" },
   { path: "/insights", icon: "ph:chart-bar-duotone", label: "Insights" },
   { path: "/profile", icon: "ph:user-circle-duotone", label: "Profile" },

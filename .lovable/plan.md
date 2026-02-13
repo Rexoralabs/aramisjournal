@@ -1,338 +1,311 @@
-# Aramis Comprehensive Refinement Plan
 
-## Write Module Overhaul, Icons Migration, Calendar Animation, Orchard 3D, Cellar AI Unification, Insights Charts, Settings Expansion, Home Layout Match
+# Aramis Comprehensive Update Plan
+## Cellar-Compose Linking, Module Rename, AI Fixes, Auth/Analytics Refinement, Focus Module, Gamification, Offline, RAG, Notifications
 
 ---
 
 ## Overview
 
-This plan addresses 12 distinct changes across the application:
+11 major areas of work, ordered by implementation sequence:
 
-1. **Write Module** -- Remove mood selector, "Today" button, save button; add auto-save, formatting toolbar, AI summary, and entry sidebar
-2. **Remove date from bottom nav** ("02.12.26")
-3. **Switch all icons from Solar Iconify to Phosphor** icons
-4. **Calendar** -- Make grid smaller, add GSAP flip-up/flip-down page animation for month transitions
-5. **Fix Orchard icon** in bottom nav (not showing)
-6. **Orchard 3D immersive experience** -- Full parallax walkthrough with trees, grass, depth layers using GSAP ScrollTrigger (**React Three Fiber (R3F)**, **Three.js**, **WebGL**, and **GSAP**)
-7. **Cellar AI unification** -- Cellar sidebar AI shares the same conversation history as Home chat
-8. **Insights** -- Add a line graph and bar graph (using Recharts, already installed)
-9. **Settings module** -- Add more features and content
-10. **Home page** -- Match the wireframe layout exactly (sidebar, "43 of 365", greeting, pill input, 5-icon nav)
-
----
-
-## 1. Write Module Overhaul
-
-### Removals
-
-- **Mood selector button** (lines 226-242 in WritePage.tsx) -- Remove the emoji circle button and the `showMoodSelector` state and `MoodSelector` dropdown
-- **"Today" entry selector button** (lines 186-224) -- Remove the dropdown that shows "Today" with a chevron and entry list
-- **Save button** (lines 269-278) -- Remove the manual save/update button
-- **Date display** (lines 294-299) -- Remove the "Wednesday, February 12, 2026" line
-
-### Auto-Save
-
-Add a debounced auto-save using `useEffect` + `useCallback`:
-
-- Debounce timer of 1.5 seconds after typing stops
-- Auto-save triggers `updateEntry` if entry exists, or `createEntry` if new
-- Show a subtle "Saved" indicator (small text near the word count)
-- Track save status: "Saving...", "Saved", or unsaved indicator
-
-### Formatting Toolbar
-
-Add a simple formatting bar above the text area with basic controls:
-
-- **Bold** (wraps selection in `**text**`)
-- **Italic** (wraps in `*text*`)
-- **Heading** (prepends `##` )
-- **List** (prepends `-` )
-- **Quote** (prepends `>` )
-
-The content remains stored as plain text with markdown syntax. The toolbar inserts markdown characters around the cursor position or selection.
-
-### AI Summary Button
-
-- Add a button below the content area labeled "Generate Summary"
-- When pressed, send the current content to the `chat` edge function with a system prompt: "Summarize the following journal entry in 2-6 concise sentences."
-- Display the summary in a glass-card below the editor with a subtle fade-in animation
-- The summary Should Be editable and saved in DB
-
-### Entry Sidebar
-
-Add a sidebar (similar to ChatSidebar) on the Write page:
-
-- **Hamburger button** in the header to toggle it
-- **"New Entry"** button at top
-- **Entry list** showing all journal entries with title, date, and a delete button
-- **Delete confirmation** via AlertDialog
-- Clicking an entry loads it into the editor (same as current `handleSelectEntry` logic)
+1. Database migrations (ai_summary, todos, achievements, points)
+2. Rename "Write" to "Compose" (routes, nav, references)
+3. Cellar click-to-edit linking
+4. Compose fixes (formatting, multi-note, remove toasts, AI summary persistence)
+5. Auth page redesign (split-panel layout matching reference)
+6. Replace Orchard with Focus module (To-Do + Pomodoro)
+7. Insights/Analytics page refinement (dashboard-style matching reference)
+8. Cellar AI and RAG implementation
+9. Gamification system (points + achievements)
+10. Offline mode (PWA enhancement)
+11. Notifications enhancement
 
 ---
 
-## 2. Remove Date from Bottom Nav
+## 1. Database Migrations
 
-In `BottomNav.tsx` line 77-79, remove:
+Four schema changes in a single migration:
 
-```tsx
-<span className="absolute right-4 sm:right-6 bottom-1 text-xs font-ui text-muted-foreground">
-  {format(new Date(), "MM.dd.yy")}
-</span>
+```sql
+-- AI Summary column on journal_entries
+ALTER TABLE public.journal_entries ADD COLUMN IF NOT EXISTS ai_summary TEXT;
+
+-- Todos table
+CREATE TABLE public.todos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  title TEXT NOT NULL,
+  completed BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public.todos ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own todos" ON public.todos FOR ALL TO authenticated
+  USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- Achievements table
+CREATE TABLE public.user_achievements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  achievement_key TEXT NOT NULL,
+  unlocked_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, achievement_key)
+);
+ALTER TABLE public.user_achievements ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own achievements" ON public.user_achievements FOR ALL TO authenticated
+  USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- Points column on user_streaks
+ALTER TABLE public.user_streaks ADD COLUMN IF NOT EXISTS total_points INTEGER DEFAULT 0;
 ```
 
 ---
 
-## 3. Switch to Phosphor Icons
+## 2. Rename "Write" to "Compose"
 
-Replace all `@iconify/react` Solar icons with Phosphor icons. Phosphor icons are available via Iconify with the prefix `ph:`.
-
-### Icon Mapping
-
-
-| Current Solar Icon                  | Phosphor Replacement        |
-| ----------------------------------- | --------------------------- |
-| `solar:home-2-bold-duotone`         | `ph:house-duotone`          |
-| `solar:pen-new-square-bold-duotone` | `ph:pencil-simple-duotone`  |
-| `solar:calendar-bold-duotone`       | `ph:calendar-duotone`       |
-| `solar:tree-bold-duotone`           | `ph:tree-duotone`           |
-| `solar:archive-bold-duotone`        | `ph:vault-duotone`          |
-| `solar:chart-square-bold-duotone`   | `ph:chart-bar-duotone`      |
-| `solar:user-rounded-bold-duotone`   | `ph:user-circle-duotone`    |
-| `solar:hamburger-menu-linear`       | `ph:list`                   |
-| `solar:sun-bold-duotone`            | `ph:sun-duotone`            |
-| `solar:moon-bold-duotone`           | `ph:moon-duotone`           |
-| `solar:plain-bold`                  | `ph:paper-plane-right-fill` |
-| `solar:stars-bold-duotone`          | `ph:sparkle-duotone`        |
-| `solar:close-circle-linear`         | `ph:x-circle`               |
-
-
-### Files to Update
-
-- `src/components/layout/BottomNav.tsx`
-- `src/pages/HomePage.tsx`
-- `src/components/chat/ChatInput.tsx`
-- `src/pages/CellarPage.tsx`
-- `src/components/cellar/CellarAISidebar.tsx`
+### Files Changed
+- **`src/components/layout/BottomNav.tsx`** -- Change nav item: path `/write` to `/compose`, label "Write" to "Compose"
+- **`src/App.tsx`** -- Change route `path="/write"` to `path="/compose"`
+- **`src/pages/CellarPage.tsx`** -- Update empty-state text referencing "Compose module"
 
 ---
 
-## 4. Calendar Flip Animation
+## 3. Cellar Click-to-Edit
 
-### Make Calendar Smaller
-
-- Reduce the calendar grid cell size by using smaller padding and font sizes
-- Add `max-w-md mx-auto` to constrain the calendar width on desktop
-
-### GSAP Flip Animation
-
-Replace the current horizontal slide (x-based) month transition with a vertical flip effect:
-
-**Next month (flip up):**
-
-```typescript
-gsap.to(monthRef.current, {
-  rotateX: -90,
-  opacity: 0,
-  duration: 0.3,
-  ease: "power2.in",
-  transformOrigin: "bottom center",
-  onComplete: () => {
-    setCurrentMonth(addMonths(currentMonth, 1));
-    gsap.fromTo(monthRef.current,
-      { rotateX: 90, opacity: 0, transformOrigin: "top center" },
-      { rotateX: 0, opacity: 1, duration: 0.3, ease: "power2.out" }
-    );
-  }
-});
-```
-
-**Previous month (flip down):**
-
-```typescript
-gsap.to(monthRef.current, {
-  rotateX: 90,
-  opacity: 0,
-  duration: 0.3,
-  ease: "power2.in",
-  transformOrigin: "top center",
-  onComplete: () => {
-    setCurrentMonth(subMonths(currentMonth, 1));
-    gsap.fromTo(monthRef.current,
-      { rotateX: -90, opacity: 0, transformOrigin: "bottom center" },
-      { rotateX: 0, opacity: 1, duration: 0.3, ease: "power2.out" }
-    );
-  }
-});
-```
-
-Add `perspective: 1000px` to the parent container for proper 3D perspective.
+### `src/components/cellar/ThoughtCard.tsx`
+- Import `useNavigate` from react-router-dom
+- Wrap card in clickable div with `onClick={() => navigate('/compose?entry=' + entry.id)}`
+- Add `cursor-pointer hover:scale-[1.02] transition-transform`
 
 ---
 
-## 5. Fix Orchard Icon in Bottom Nav
+## 4. Compose Module Fixes
 
-The current icon is `solar:tree-bold-duotone`. After the Phosphor migration, it becomes `ph:tree-duotone`. This should render correctly as Phosphor has a tree icon. If the current Solar one isn't loading, this migration will fix it.
+### 4.1 Multiple Notes Support (`src/pages/WritePage.tsx`)
+- Add `isNewEntryRef = useRef(false)` flag
+- When "New Entry" is clicked, set `isNewEntryRef.current = true`
+- In auto-save logic: when `isNewEntryRef` is true AND no `selectedEntryId`, always create new entry (skip todayEntry overwrite)
+- After creation, update URL with new entry ID and reset the ref
+
+### 4.2 Remove "Saved" Toasts (`src/hooks/useJournal.ts`)
+- Remove `toast.success("Entry saved successfully!")` from `useCreateEntry.onSuccess` (line 123)
+- Remove `toast.success("Entry updated!")` from `useUpdateEntry.onSuccess` (line 157)
+- Keep all error toasts intact
+
+### 4.3 Fix Formatting Toolbar (`src/pages/WritePage.tsx`)
+Split `insertFormatting` into two distinct functions:
+
+- **`wrapSelection(prefix, suffix)`** -- For Bold (`**`) and Italic (`*`): wraps selected text or inserts at cursor
+- **`prependLine(prefix)`** -- For Heading (`## `), List (`- `), Quote (`> `): finds the beginning of the current line and prepends the prefix there
+
+Update toolbar buttons to call the correct function for each format type.
+
+### 4.4 AI Summary -- Editable and Persisted (`src/pages/WritePage.tsx`)
+- Load `ai_summary` from the current entry when selecting it
+- Make the summary display a `textarea` instead of a `<p>` tag
+- Auto-save summary changes to DB via debounced `updateEntry` with the new `ai_summary` field
+- Update `useUpdateEntry` in `useJournal.ts` to handle the `ai_summary` field
 
 ---
 
-## 6. Orchard -- Immersive Parallax Experience
+## 5. Auth Page Redesign
 
-### **The 3D Orchard Architecture**
+### Design Direction (matching the BrightNest reference image)
+The reference shows a **split-panel layout**:
+- **Left panel**: Warm gradient background with brand name top-left, motivational tagline bottom-left
+- **Right panel**: Clean white card with form fields, clean labels, a prominent dark submit button, "or continue with" social login row, and toggle link at bottom
 
-**1. The 3D Scene (Back to Front):**
+### Changes to `src/pages/AuthPage.tsx`
+- Replace single centered column with a two-panel `grid grid-cols-1 lg:grid-cols-2` layout
+- **Left panel**: Full-height warm gradient (`bg-gradient-to-br from-amber-100 via-orange-100 to-rose-100`), "Aramis" brand top-left, motivational copy bottom-left ("Get access to your personal hub for clarity and productivity.")
+- **Right panel**: White/card background, clean form with:
+  - Decorative accent icon (sparkle) above title
+  - "Create an account" / "Welcome back" heading
+  - Subtitle text
+  - Clean labeled inputs with border styling (not underline -- matching reference which shows bordered inputs)
+  - Password field with show/hide toggle (Phosphor eye icon)
+  - Dark full-width rounded submit button
+  - "or continue with" divider (placeholder for future OAuth)
+  - Toggle link at bottom ("Already have an account? Sign in")
+- Replace Lucide icons with Phosphor via `@iconify/react`
+- On mobile: stack panels vertically (left panel shorter, right panel full)
 
-- **The Skybox/Environment:** A 3D Background Gradient or a large Sphere wrapping the scene.
-- **The Forest (Deep Z-Space):** Instead of silhouettes, use **Instanced Meshes** of 3D trees scattered at various `z` depths (from -50 to -10).
-- **The Path (Ground Plane):** A 3D PlaneGeometry with a grass texture, stretching toward the horizon.
-- **Fruit Milestones:** 3D models (glTF) of fruits floating in space, positioned at specific "stations" along the Z-axis.
+---
 
-**2. GSAP Camera Navigation:**  
-Instead of moving layers, we animate the **Camera's Z-position**. As the user scrolls, the camera "walks" through the trees.
+## 6. Replace Orchard with Focus Module
 
-**javascript**
+### Remove Orchard
+- Rewrite `src/pages/OrchardPage.tsx` as `FocusPage` content (keep the filename to minimize routing changes, but update the route path)
+- Update `BottomNav.tsx`: change Orchard entry to path `/focus`, label "Focus", icon `ph:timer-duotone`
+- Update `App.tsx`: change route from `/orchard` to `/focus`
+- Remove Three.js/R3F Canvas code entirely from the page
 
-```
-// GSAP Timeline to fly the camera through the orchard
-const tl = gsap.timeline({
-  scrollTrigger: {
-    trigger: "#viewport",
-    start: "top top",
-    end: "bottom bottom",
-    scrub: 1 // Smoothly tracks scroll position
-  }
-});
+### New Components
 
-// Move camera forward and tilt slightly as you walk
-tl.to(camera.position, { z: -100, ease: "none" }); 
+**`src/components/focus/PomodoroTimer.tsx`**
+- Circular SVG progress ring (radius ~120, stroke-dasharray animation)
+- 25-minute work / 5-minute break cycles
+- States: idle, running, paused, break
+- Start/Pause/Reset button controls
+- Session counter display
+- Notification on timer completion
+- GSAP animation for timer state transitions
 
-```
+**`src/components/focus/TodoList.tsx`**
+- Add task input with rounded pill + plus button
+- List of `TodoItem` components
+- Empty state message
 
-Use code with caution.
+**`src/components/focus/TodoItem.tsx`**
+- Checkbox (Phosphor icon), title text, delete button
+- Completed tasks: strikethrough + reduced opacity
+- Slide-in animation on creation, fade-out on deletion
 
-**3. Visual Components (The R3F Way):**  
-Replace your CSS `.tree-silhouette` with a reusable React component:
+**`src/hooks/useTodos.ts`**
+- `useTodos()` -- Fetch all todos for current user, ordered by created_at desc
+- `useCreateTodo()` -- Insert new todo
+- `useToggleTodo()` -- Toggle completed status
+- `useDeleteTodo()` -- Delete todo
 
-**jsx**
-
-```
-function Tree({ position }) {
-  return (
-    <mesh position={position}>
-      <coneGeometry args={[1, 3, 8]} /> {/* Simple 3D cone tree */}
-      <meshStandardMaterial color="#2d4f1e" />
-    </mesh>
-  );
-}
+### Focus Page Layout
+```text
++------------------------------------------+
+|  Focus                                   |
++------------------------------------------+
+|  [Large Pomodoro Timer Ring]             |
+|  25:00                                   |
+|  [Start]  [Reset]                        |
+|  Sessions: 3                             |
++------------------------------------------+
+|  Tasks                        [+ input]  |
+|  [ ] Task 1                      [x]     |
+|  [x] Task 2 (strikethrough)     [x]     |
++------------------------------------------+
 ```
 
 ---
 
-## 7. Cellar AI Shares Home Chat History
+## 7. Insights/Analytics Page Refinement
 
-### Current Behavior
+### Design Direction (matching the Karla dashboard reference)
+The reference shows:
+- Dark glass cards in a horizontal row (4 stat cards) with mini sparkline charts and metadata
+- A large area chart below with time-range toggle pills (7d / 30d)
+- Side promotional cards
 
-The CellarAISidebar has its own local `messages` state -- conversations are not persisted and don't connect to the Home chat system.
+### Adapted for Aramis
+- **Top row**: 4 stat cards in `grid-cols-2 lg:grid-cols-4` -- each card is a glass-card with:
+  - Small label (e.g., "Today's Words", "This Week", "This Month", "All Time")
+  - Large number value
+  - Mini sparkline or trend indicator
+  - Date range and entry count metadata at bottom
+- **Main chart section**: Large AreaChart (word count over time, last 30 days) with 7d/30d toggle pills
+- **Secondary row**: Side-by-side `grid-cols-1 lg:grid-cols-2`:
+  - BarChart (Entries Per Week)
+  - Mood trend AreaChart
+- **Bottom section**: Monthly progress card with progress bar
+- **New data calculations**:
+  - Total words per day (for word count chart)
+  - Most active writing day of week
+  - Day-of-week activity breakdown
 
-### Changes
-
-- **CellarAISidebar** will use the same `useChatConversations`, `useChatMessages`, `useCreateConversation`, `useAddMessage` hooks from `useChatHistory`
-- When the sidebar opens, it creates a new conversation (or continues the most recent one)
-- Messages sent from the Cellar sidebar are stored in the `chat_conversations`/`chat_messages` tables
-- These conversations appear in the Home module's ChatSidebar history
-- The system prompt is still specialized for journal exploration, but the conversation persists
-
-### Implementation
-
-Replace local state in `CellarAISidebar` with the shared hooks:
-
-```tsx
-const { data: conversations } = useChatConversations();
-const createConversation = useCreateConversation();
-const addMessage = useAddMessage();
-// ... use same pattern as HomePage
-```
-
----
-
-## 8. Insights -- Line Graph and Bar Graph
-
-### Using Recharts (already installed)
-
-**Line Graph: Mood Over Time**
-
-- X-axis: dates (last 30 days)
-- Y-axis: mood value (1-5 scale)
-- Line with primary color, area fill with gradient
-- Tooltip showing date and mood label
-
-**Bar Graph: Entries Per Week**
-
-- X-axis: week labels (last 8 weeks)
-- Y-axis: number of entries
-- Bars in primary color with rounded tops
-- Clean minimal styling matching the design system
-
-### Placement
-
-Replace the current "Mood Breakdown" and "This Week" cards with the two graphs side by side (or stacked on mobile).
+### Changes to `src/pages/InsightsPage.tsx`
+- Add word count trend data (aggregate `word_count` per day from entries)
+- Add most active day calculation
+- Restructure grid for dashboard-style layout
+- Add mini sparklines in stat cards using small inline Recharts
+- Polish filter chips with pill shape (`rounded-full`)
 
 ---
 
-## 9. Settings Module Expansion
+## 8. AI RAG (Retrieval-Augmented Generation)
 
-Add these new sections to `AppSettingsPage.tsx`:
+### Edge Function Update (`supabase/functions/chat/index.ts`)
+- Accept optional `context` field in request body
+- If present, prepend to system prompt: "Here are the user's recent journal entries for reference:\n\n{context}"
 
-### New Features
+### Frontend Changes
 
-1. **Writing Goal** -- Daily word count target (e.g., 100, 250, 500 words) with a selector
-2. **Theme Accent Color** -- Choice between Gold (current), Rose, Sage, Ocean
-3. **Auto-Save Interval** -- Toggle between 1s, 2s, 3s auto-save delay
-4. **Data & Storage** -- Show storage usage estimate (count of entries, approximate size)
-5. **Journal Backup** -- Button to export all entries as JSON (functional)
-6. **Clear All Data** -- Danger zone button to delete all journal entries
-7. **Language** -- Placeholder for future i18n (display only, "English" selected)
+**`src/hooks/useStreamChat.ts`**
+- Add optional `context?: string` to `StreamChatOptions`
+- Include `context` in request body when present
 
-### Reorganization
+**`src/pages/HomePage.tsx`**
+- Import `useJournalEntries`
+- Before sending chat messages, build a condensed context string from recent entries (titles + first 100 chars, last 20 entries)
+- Pass as `context` parameter to `streamChat`
 
-Group settings into sections:
-
-- **Writing** (Font Size, Writing Goal, Auto-Save)
-- **Experience** (Sound, Haptics, AI Prompts)
-- **Notifications** (Toggle, Reminder Time)
-- **Data** (Backup, Storage, Clear Data)
-- **About** (Version, Support link)
+**`src/components/cellar/CellarAISidebar.tsx`**
+- Refactor to pass journal entries as `context` field instead of injecting as a fake user message
+- Remove the `buildSystemPrompt` function that prepends entries as a user message
+- Instead, pass the entries context string via the `context` parameter
 
 ---
 
-## 10. Home Page -- Wireframe Match
+## 9. Gamification System
 
-### Reference Image Analysis
+### New Hooks
 
-The wireframe shows:
+**`src/hooks/useAchievements.ts`**
+- `useAchievements()` -- Fetch user's unlocked achievements
+- `useUnlockAchievement()` -- Insert new achievement (idempotent via unique constraint)
 
-1. **Left sidebar** -- hamburger + search at top, "New Chat" with icon, "Convos" collapsible section, conversation list
-2. **Top center** -- "43 *of* 365" (day counter, italic "of")
-3. **Top right** -- Theme toggle (circle)
-4. **Center** -- Large "Hey, Charis." greeting in serif, "How Was Your Day?" subtitle
-5. **Below greeting** -- Large rounded pill input
-6. **Bottom** -- 5-icon floating pill nav (Home, Write, Orchard, Grid/Insights, Profile) with date to the right
+**`src/hooks/useGamification.ts`**
+- `useAwardPoints(amount)` -- Increment `total_points` on `user_streaks`
+- `useCheckAchievements()` -- Check conditions and unlock achievements
+- Achievement definitions (key, name, condition, icon):
+  - `first_words` -- Write first entry
+  - `week_warrior` -- 7-day streak
+  - `centurion` -- 100 entries
+  - `marathon_writer` -- 1000+ words in one entry
+  - `night_owl` -- Write after 10 PM
+  - `early_bird` -- Write before 7 AM
+  - `focused_mind` -- Complete 5 pomodoros in a day
+  - `task_master` -- Complete 10 tasks
 
-### Current State vs Wireframe
+### Points Integration
+- In `WritePage.tsx` auto-save: award +10 points on new entry, +5 bonus for 100+ words, +15 for 500+
+- In `PomodoroTimer.tsx`: award +8 points on session completion
+- In `TodoItem.tsx`: award +3 points on task completion
 
-The current implementation already matches fairly well. Key adjustments:
+### Display
+- **`src/pages/ProfilePage.tsx`**: Add points display and achievement badges section
+- **`src/pages/InsightsPage.tsx`**: Add total points at bottom
 
-- **Bottom nav**: Reduce to 5 icons (remove Calendar and Cellar from the main nav, keep them accessible via sidebar or other means). Per the wireframe: Home, Write, Orchard, Insights, Profile.
+---
 
-Actually, looking more carefully, the wireframe shows exactly 5 icons. However, the user has also asked for Calendar, Cellar, etc. So the bottom nav should keep all 7 icons as currently implemented -- the wireframe is a design direction, not a strict icon count. The layout arrangement (sidebar left, counter top-center, toggle top-right, greeting center, input below) is already implemented.
+## 10. Offline Mode
 
-### Adjustments Needed
+### PWA Enhancement (`vite.config.ts`)
+- Add `runtimeCaching` configuration for Supabase API calls using `NetworkFirst` strategy
+- Add `navigateFallback: '/index.html'`
+- Add `navigateFallbackDenylist: [/^\/~oauth/]` for OAuth compatibility
 
-- The current layout matches the wireframe well. Minor tweaks:
-  - Ensure the greeting is vertically centered in available space (already using `flex-1 flex items-center justify-center`)
-  - Ensure the pill input has generous padding and rounded-full shape (already done)
-  - Sidebar layout matches (already has hamburger, search, New Chat, Convos sections)
+### New File: `src/lib/offlineQueue.ts`
+- Queue mutations in `localStorage` when `navigator.onLine === false`
+- On `online` event, flush queued mutations
+- Wrapper function for Supabase mutations
 
-No major structural changes needed for the Home page -- it already follows the wireframe.
+### New Component: `src/components/layout/OfflineBanner.tsx`
+- Subtle top banner showing "You're offline. Changes will sync when reconnected."
+- GSAP slide-in/out animation
+
+### `src/App.tsx`
+- Add `online`/`offline` event listeners
+- Render `OfflineBanner` conditionally
+
+---
+
+## 11. Notifications Enhancement
+
+### `src/lib/notifications.ts`
+- Add `tag: 'aramis-reminder'` to prevent duplicate notifications
+- Use service worker registration (`navigator.serviceWorker.ready`) when available
+- Add permission status check function for Settings display
+
+### `src/pages/AppSettingsPage.tsx`
+- Show notification permission status (granted/denied/default)
+- Add visual indicator next to toggle
 
 ---
 
@@ -340,85 +313,52 @@ No major structural changes needed for the Home page -- it already follows the w
 
 ### New Files
 
-None -- all changes are modifications to existing files.
+| File | Purpose |
+|------|---------|
+| `src/hooks/useTodos.ts` | CRUD hooks for todos table |
+| `src/hooks/useAchievements.ts` | Achievement tracking hooks |
+| `src/hooks/useGamification.ts` | Points system and achievement checks |
+| `src/lib/offlineQueue.ts` | Offline mutation queue |
+| `src/components/focus/PomodoroTimer.tsx` | Circular countdown timer |
+| `src/components/focus/TodoList.tsx` | To-do list component |
+| `src/components/focus/TodoItem.tsx` | Individual todo item |
+| `src/components/layout/OfflineBanner.tsx` | Offline status indicator |
 
 ### Modified Files
 
-
-| File                                        | Changes                                                                              |
-| ------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `src/pages/WritePage.tsx`                   | Remove mood/today/save, add auto-save, formatting toolbar, AI summary, entry sidebar |
-| `src/components/layout/BottomNav.tsx`       | Remove date, switch to Phosphor icons                                                |
-| `src/pages/HomePage.tsx`                    | Switch to Phosphor icons                                                             |
-| `src/components/chat/ChatInput.tsx`         | Switch to Phosphor icons                                                             |
-| `src/pages/CellarPage.tsx`                  | Switch to Phosphor icons                                                             |
-| `src/components/cellar/CellarAISidebar.tsx` | Switch to Phosphor icons, integrate shared chat history                              |
-| `src/pages/CalendarPage.tsx`                | Smaller grid, GSAP flip animation with perspective                                   |
-| `src/pages/OrchardPage.tsx`                 | Full immersive parallax rewrite with layered depth                                   |
-| `src/pages/InsightsPage.tsx`                | Add Recharts line and bar graphs                                                     |
-| `src/pages/AppSettingsPage.tsx`             | Expand with new settings sections                                                    |
-| `src/components/chat/ChatSidebar.tsx`       | Switch Lucide icons to Phosphor where applicable                                     |
-
-
-### No Database Changes Required
-
----
-
-## Technical Details
-
-### Auto-Save Debounce Pattern
-
-```typescript
-const saveTimerRef = useRef<NodeJS.Timeout>();
-const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
-
-useEffect(() => {
-  if (!content.trim()) return;
-  setSaveStatus("idle");
-  
-  clearTimeout(saveTimerRef.current);
-  saveTimerRef.current = setTimeout(async () => {
-    setSaveStatus("saving");
-    // save logic...
-    setSaveStatus("saved");
-  }, 1500);
-
-  return () => clearTimeout(saveTimerRef.current);
-}, [content, title]);
-```
-
-### Formatting Toolbar -- Markdown Insertion
-
-```typescript
-function insertFormatting(textarea: HTMLTextAreaElement, prefix: string, suffix: string = "") {
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const selected = textarea.value.substring(start, end);
-  const replacement = `${prefix}${selected}${suffix}`;
-  // Update content state with replacement
-}
-```
-
-### Recharts Minimal Styling
-
-```tsx
-<LineChart data={moodData}>
-  <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-  <YAxis domain={[1, 5]} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-  <Line type="monotone" dataKey="mood" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-</LineChart>
-```
+| File | Changes |
+|------|---------|
+| `src/pages/WritePage.tsx` | Fix formatting, multi-note, AI summary persistence |
+| `src/hooks/useJournal.ts` | Remove success toasts, add ai_summary support |
+| `src/components/cellar/ThoughtCard.tsx` | Click-to-navigate to Compose |
+| `src/pages/CellarPage.tsx` | Update empty state text |
+| `src/components/layout/BottomNav.tsx` | Rename Write to Compose, Orchard to Focus |
+| `src/App.tsx` | Update routes, add offline listener, offline banner |
+| `src/pages/AuthPage.tsx` | Complete redesign with split-panel layout |
+| `src/pages/InsightsPage.tsx` | Dashboard-style layout with stat cards and charts |
+| `src/pages/OrchardPage.tsx` | Complete rewrite as Focus page (Pomodoro + Todos) |
+| `src/pages/AppSettingsPage.tsx` | Notification status indicator |
+| `src/pages/HomePage.tsx` | Pass journal context for RAG |
+| `src/hooks/useStreamChat.ts` | Accept context parameter |
+| `supabase/functions/chat/index.ts` | Accept and use context field for RAG |
+| `src/components/cellar/CellarAISidebar.tsx` | Use context field instead of fake user message |
+| `vite.config.ts` | Enhanced PWA offline caching |
+| `src/pages/ProfilePage.tsx` | Points and achievements display |
+| `src/lib/notifications.ts` | Tag deduplication, SW integration |
 
 ---
 
 ## Implementation Order
 
-1. Switch all icons to Phosphor (across all files)
-2. Remove date from bottom nav
-3. Write module overhaul (removals, auto-save, toolbar, AI summary, sidebar)
-4. Calendar flip animation
-5. Orchard immersive parallax
-6. Cellar AI unification with shared chat history
-7. Insights line + bar graphs
-8. Settings expansion
-9. Testing across all modules
+1. Database migrations (ai_summary, todos, achievements, points)
+2. Rename Write to Compose (routes, nav)
+3. Cellar click-to-edit linking
+4. Compose fixes (formatting, multi-note, remove toasts, AI summary)
+5. Auth page redesign (split-panel matching reference)
+6. Replace Orchard with Focus (Pomodoro + To-Do)
+7. Insights page refinement (dashboard layout matching reference)
+8. RAG implementation (edge function + frontend context passing)
+9. Gamification system (hooks, points, achievements, profile display)
+10. Offline mode (PWA caching, queue, banner)
+11. Notifications enhancement
+12. Deploy edge function and end-to-end testing

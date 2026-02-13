@@ -120,7 +120,7 @@ export function useCreateEntry() {
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["today-entry"] });
       queryClient.invalidateQueries({ queryKey: ["user-streaks"] });
-      toast.success("Entry saved successfully!");
+      // Silent save - no toast
     },
     onError: (error) => {
       toast.error("Failed to save entry: " + error.message);
@@ -154,7 +154,7 @@ export function useUpdateEntry() {
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["today-entry"] });
       queryClient.invalidateQueries({ queryKey: ["journal-entry"] });
-      toast.success("Entry updated!");
+      // Silent save - no toast
     },
     onError: (error) => {
       toast.error("Failed to update entry: " + error.message);

@@ -100,6 +100,7 @@ export type Database = {
       journal_entries: {
         Row: {
           ai_mood_analysis: Json | null
+          ai_summary: string | null
           content: string
           created_at: string
           entry_date: string
@@ -113,6 +114,7 @@ export type Database = {
         }
         Insert: {
           ai_mood_analysis?: Json | null
+          ai_summary?: string | null
           content: string
           created_at?: string
           entry_date?: string
@@ -126,6 +128,7 @@ export type Database = {
         }
         Update: {
           ai_mood_analysis?: Json | null
+          ai_summary?: string | null
           content?: string
           created_at?: string
           entry_date?: string
@@ -181,6 +184,54 @@ export type Database = {
         }
         Relationships: []
       }
+      todos: {
+        Row: {
+          completed: boolean | null
+          created_at: string | null
+          id: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          created_at?: string | null
+          id?: string
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          created_at?: string | null
+          id?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_achievements: {
+        Row: {
+          achievement_key: string
+          id: string
+          unlocked_at: string | null
+          user_id: string
+        }
+        Insert: {
+          achievement_key: string
+          id?: string
+          unlocked_at?: string | null
+          user_id: string
+        }
+        Update: {
+          achievement_key?: string
+          id?: string
+          unlocked_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_milestones: {
         Row: {
           achieved_at: string
@@ -210,6 +261,7 @@ export type Database = {
           last_entry_date: string | null
           longest_streak: number | null
           total_entries: number | null
+          total_points: number | null
           updated_at: string
           user_id: string
         }
@@ -220,6 +272,7 @@ export type Database = {
           last_entry_date?: string | null
           longest_streak?: number | null
           total_entries?: number | null
+          total_points?: number | null
           updated_at?: string
           user_id: string
         }
@@ -230,6 +283,7 @@ export type Database = {
           last_entry_date?: string | null
           longest_streak?: number | null
           total_entries?: number | null
+          total_points?: number | null
           updated_at?: string
           user_id?: string
         }

@@ -5,11 +5,7 @@ import { useStreamChat } from "@/hooks/useStreamChat";
 import { haptic } from "@/lib/haptics";
 import { soundManager } from "@/lib/sounds";
 import {
-  useChatConversations,
-  useChatMessages,
-  useCreateConversation,
-  useAddMessage,
-  useUpdateConversationTitle,
+  useChatConversations, useChatMessages, useCreateConversation, useAddMessage, useUpdateConversationTitle,
 } from "@/hooks/useChatHistory";
 import type { JournalEntry } from "@/hooks/useJournal";
 
@@ -17,6 +13,12 @@ interface CellarAISidebarProps {
   isOpen: boolean;
   onClose: () => void;
   entries: JournalEntry[];
+}
+
+function buildEntriesContext(entries: JournalEntry[]): string {
+  return entries.slice(0, 20).map(e =>
+    `- "${e.title || "Untitled"}" (${e.entry_date}): ${e.content.slice(0, 200)}`
+  ).join("\n");
 }
 
 export function CellarAISidebar({ isOpen, onClose, entries }: CellarAISidebarProps) {
@@ -28,7 +30,6 @@ export function CellarAISidebar({ isOpen, onClose, entries }: CellarAISidebarPro
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { streamChat } = useStreamChat();
 
-  const { data: conversations = [] } = useChatConversations();
   const { data: messages = [] } = useChatMessages(conversationId);
   const createConversation = useCreateConversation();
   const addMessage = useAddMessage();
@@ -47,22 +48,12 @@ export function CellarAISidebar({ isOpen, onClose, entries }: CellarAISidebarPro
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamContent]);
 
-  const buildSystemPrompt = () => {
-    const entriesText = entries
-      .slice(0, 20)
-      .map(e => `- "${e.title || "Untitled"}" (${e.entry_date}): ${e.content.slice(0, 200)}`)
-      .join("\n");
-    return `You are Aramis, helping the user explore their journal entries. Here are their recent entries:\n\n${entriesText}\n\nAsk questions, find connections, and brainstorm ideas based on what they've written. Be concise and insightful.`;
-  };
-
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
     haptic("medium");
     soundManager.play("send");
 
     let convId = conversationId;
-
-    // Create or reuse conversation
     if (!convId) {
       const newConv = await createConversation.mutateAsync("Cellar Chat");
       convId = newConv.id;
@@ -71,10 +62,8 @@ export function CellarAISidebar({ isOpen, onClose, entries }: CellarAISidebarPro
 
     const userContent = input.trim();
     setInput("");
-
     await addMessage.mutateAsync({ conversationId: convId, role: "user", content: userContent });
 
-    // Update title from first message
     if (messages.length === 0) {
       const title = userContent.slice(0, 50) + (userContent.length > 50 ? "..." : "");
       await updateTitle.mutateAsync({ id: convId, title });
@@ -84,18 +73,17 @@ export function CellarAISidebar({ isOpen, onClose, entries }: CellarAISidebarPro
     setStreamContent("");
 
     const chatMsgs = [
-      { role: "user" as const, content: buildSystemPrompt() },
       ...messages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
       { role: "user" as const, content: userContent },
     ];
 
+    const context = buildEntriesContext(entries);
     let fullResponse = "";
+
     await streamChat({
       messages: chatMsgs,
-      onDelta: (chunk) => {
-        fullResponse += chunk;
-        setStreamContent(fullResponse);
-      },
+      context,
+      onDelta: (chunk) => { fullResponse += chunk; setStreamContent(fullResponse); },
       onDone: async () => {
         setIsStreaming(false);
         setStreamContent("");
@@ -105,10 +93,7 @@ export function CellarAISidebar({ isOpen, onClose, entries }: CellarAISidebarPro
         haptic("success");
         soundManager.play("receive");
       },
-      onError: () => {
-        setIsStreaming(false);
-        setStreamContent("");
-      },
+      onError: () => { setIsStreaming(false); setStreamContent(""); },
     });
   };
 
@@ -137,40 +122,26 @@ export function CellarAISidebar({ isOpen, onClose, entries }: CellarAISidebarPro
           </div>
         ))}
         {streamContent && (
-          <div className="flex justify-start">
-            <div className="chat-bubble-assistant">
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{streamContent}</p>
-            </div>
-          </div>
+          <div className="flex justify-start"><div className="chat-bubble-assistant"><p className="text-sm leading-relaxed whitespace-pre-wrap">{streamContent}</p></div></div>
         )}
         {isStreaming && !streamContent && (
-          <div className="flex justify-start">
-            <div className="chat-bubble-assistant">
-              <div className="flex gap-1">
-                <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-              </div>
-            </div>
-          </div>
+          <div className="flex justify-start"><div className="chat-bubble-assistant"><div className="flex gap-1">
+            <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+          </div></div></div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
       <div className="p-4 border-t border-border">
         <div className="flex items-center gap-2">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
+          <input value={input} onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
             placeholder="Explore your thoughts..."
-            className="flex-1 bg-muted rounded-2xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || isStreaming}
-            className="h-10 w-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-50 hover:scale-105 active:scale-95 transition-transform"
-          >
+            className="flex-1 bg-muted rounded-2xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
+          <button onClick={handleSend} disabled={!input.trim() || isStreaming}
+            className="h-10 w-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-50 hover:scale-105 active:scale-95 transition-transform">
             <Icon icon="ph:paper-plane-right-fill" className="h-4 w-4" />
           </button>
         </div>

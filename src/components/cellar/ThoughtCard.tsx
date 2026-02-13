@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { useNavigate } from "react-router-dom";
 import type { JournalEntry } from "@/hooks/useJournal";
 
 const moodEmoji: Record<string, string> = {
@@ -14,12 +15,16 @@ interface ThoughtCardProps {
 }
 
 export function ThoughtCard({ entry }: ThoughtCardProps) {
+  const navigate = useNavigate();
   const preview = entry.content.length > 120
     ? entry.content.slice(0, 120) + "…"
     : entry.content;
 
   return (
-    <div className="thought-card group relative">
+    <div
+      className="thought-card group relative cursor-pointer hover:scale-[1.02] transition-transform"
+      onClick={() => navigate(`/compose?entry=${entry.id}`)}
+    >
       {entry.title && (
         <h3 className="text-sm font-serif text-foreground mb-1.5 line-clamp-2">
           {entry.title}

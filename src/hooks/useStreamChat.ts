@@ -7,6 +7,7 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 interface StreamChatOptions {
   messages: Message[];
+  context?: string;
   onDelta: (delta: string) => void;
   onDone: () => void;
   onError?: (error: Error) => void;
@@ -15,7 +16,7 @@ interface StreamChatOptions {
 export function useStreamChat() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const streamChat = useCallback(async ({ messages, onDelta, onDone, onError }: StreamChatOptions) => {
+  const streamChat = useCallback(async ({ messages, context, onDelta, onDone, onError }: StreamChatOptions) => {
     // Cancel any existing request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -30,7 +31,7 @@ export function useStreamChat() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages }),
+        body: JSON.stringify({ messages, ...(context ? { context } : {}) }),
         signal: abortControllerRef.current.signal,
       });
 

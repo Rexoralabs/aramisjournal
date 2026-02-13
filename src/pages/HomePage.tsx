@@ -10,15 +10,19 @@ import { useUserProfile } from "@/hooks/useProfile";
 import { useUserStreak } from "@/hooks/useStreaks";
 import { useTheme } from "@/hooks/useTheme";
 import { useStreamChat } from "@/hooks/useStreamChat";
+import { useJournalEntries } from "@/hooks/useJournal";
 import { haptic } from "@/lib/haptics";
 import { soundManager } from "@/lib/sounds";
 import {
-  useChatConversations,
-  useChatMessages,
-  useCreateConversation,
-  useAddMessage,
-  useUpdateConversationTitle,
+  useChatConversations, useChatMessages, useCreateConversation, useAddMessage, useUpdateConversationTitle,
 } from "@/hooks/useChatHistory";
+
+function buildJournalContext(entries: any[]): string {
+  if (!entries.length) return "";
+  return entries.slice(0, 20).map(e =>
+    `- "${e.title || "Untitled"}" (${e.entry_date}): ${e.content.slice(0, 100)}`
+  ).join("\n");
+}
 
 const HomePage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -33,6 +37,7 @@ const HomePage = () => {
   const { streamChat } = useStreamChat();
   const { data: conversations = [] } = useChatConversations();
   const { data: messages = [] } = useChatMessages(currentConversationId);
+  const { data: journalEntries = [] } = useJournalEntries();
   const createConversation = useCreateConversation();
   const addMessage = useAddMessage();
   const updateTitle = useUpdateConversationTitle();
@@ -51,7 +56,6 @@ const HomePage = () => {
 
   const handleSendMessage = async (content: string) => {
     let conversationId = currentConversationId;
-    
     haptic('medium');
     soundManager.play('send');
 
@@ -61,11 +65,7 @@ const HomePage = () => {
       setCurrentConversationId(conversationId);
     }
 
-    await addMessage.mutateAsync({
-      conversationId,
-      role: "user",
-      content,
-    });
+    await addMessage.mutateAsync({ conversationId, role: "user", content });
 
     const currentConv = conversations.find(c => c.id === conversationId);
     if (!currentConv?.title && content.length > 0) {
@@ -77,37 +77,26 @@ const HomePage = () => {
     setStreamingContent("");
 
     const chatMessages = [...messages, { role: "user" as const, content }].map(m => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
+      role: m.role as "user" | "assistant", content: m.content,
     }));
 
+    const context = buildJournalContext(journalEntries);
     let fullResponse = "";
 
     await streamChat({
       messages: chatMessages,
-      onDelta: (chunk) => {
-        fullResponse += chunk;
-        setStreamingContent(fullResponse);
-      },
+      context: context || undefined,
+      onDelta: (chunk) => { fullResponse += chunk; setStreamingContent(fullResponse); },
       onDone: async () => {
         setIsTyping(false);
         setStreamingContent("");
-        
         haptic('success');
         soundManager.play('receive');
-        
         if (fullResponse && conversationId) {
-          await addMessage.mutateAsync({
-            conversationId,
-            role: "assistant",
-            content: fullResponse,
-          });
+          await addMessage.mutateAsync({ conversationId, role: "assistant", content: fullResponse });
         }
       },
-      onError: () => {
-        setIsTyping(false);
-        setStreamingContent("");
-      },
+      onError: () => { setIsTyping(false); setStreamingContent(""); },
     });
   };
 
@@ -115,106 +104,53 @@ const HomePage = () => {
 
   return (
     <>
-      <ChatSidebar
-        conversations={conversations}
-        currentConversationId={currentConversationId}
-        onSelectConversation={setCurrentConversationId}
-        onNewConversation={handleNewConversation}
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
+      <ChatSidebar conversations={conversations} currentConversationId={currentConversationId}
+        onSelectConversation={setCurrentConversationId} onNewConversation={handleNewConversation}
+        isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <PageContainer className="flex flex-col h-[calc(100vh-80px)]">
-        {/* Header */}
         <div className="flex items-center justify-between py-3">
-          <button
-            onClick={() => {
-              haptic('selection');
-              soundManager.play('swoosh');
-              setSidebarOpen(true);
-            }}
-            className="p-2 rounded-lg hover:bg-muted transition-colors touch-target"
-          >
+          <button onClick={() => { haptic('selection'); soundManager.play('swoosh'); setSidebarOpen(true); }}
+            className="p-2 rounded-lg hover:bg-muted transition-colors touch-target">
             <Icon icon="ph:list" className="h-5 w-5 text-muted-foreground" />
           </button>
-
           <div className="text-center">
             <span className="text-base sm:text-lg font-serif text-foreground">
               {dayOfYear} <span className="italic text-muted-foreground">of</span> 365
             </span>
           </div>
-
-          <button
-            onClick={() => {
-              haptic('selection');
-              setTheme(theme === "dark" ? "light" : "dark");
-            }}
-            className="p-2 rounded-lg hover:bg-muted transition-colors touch-target"
-          >
-            {theme === "dark" ? (
-              <Icon icon="ph:sun-duotone" className="h-5 w-5 text-muted-foreground" />
-            ) : (
-              <Icon icon="ph:moon-duotone" className="h-5 w-5 text-muted-foreground" />
-            )}
+          <button onClick={() => { haptic('selection'); setTheme(theme === "dark" ? "light" : "dark"); }}
+            className="p-2 rounded-lg hover:bg-muted transition-colors touch-target">
+            {theme === "dark" ? <Icon icon="ph:sun-duotone" className="h-5 w-5 text-muted-foreground" /> : <Icon icon="ph:moon-duotone" className="h-5 w-5 text-muted-foreground" />}
           </button>
         </div>
 
-        {/* Content area */}
         {showGreeting ? (
           <>
             <GreetingHeader displayName={displayName} />
             <div className="pb-8">
-              <ChatInput
-                onSend={handleSendMessage}
-                disabled={isTyping}
-                placeholder="Share your thoughts..."
-                centered
-              />
+              <ChatInput onSend={handleSendMessage} disabled={isTyping} placeholder="Share your thoughts..." centered />
             </div>
           </>
         ) : (
           <>
             <div className="flex-1 overflow-y-auto py-4 space-y-4 scrollbar-hide">
               {messages.map((msg, idx) => (
-                <ChatMessage
-                  key={msg.id}
-                  message={msg}
-                  isLatest={idx === messages.length - 1 && !streamingContent}
-                />
+                <ChatMessage key={msg.id} message={msg} isLatest={idx === messages.length - 1 && !streamingContent} />
               ))}
-
               {streamingContent && (
-                <div className="flex justify-start">
-                  <div className="chat-bubble-assistant">
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {streamingContent}
-                    </p>
-                  </div>
-                </div>
+                <div className="flex justify-start"><div className="chat-bubble-assistant"><p className="text-sm leading-relaxed whitespace-pre-wrap">{streamingContent}</p></div></div>
               )}
-
               {isTyping && !streamingContent && (
-                <div className="flex justify-start">
-                  <div className="chat-bubble-assistant">
-                    <div className="flex gap-1">
-                      <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                    </div>
-                  </div>
-                </div>
+                <div className="flex justify-start"><div className="chat-bubble-assistant"><div className="flex gap-1">
+                  <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div></div></div>
               )}
-
               <div ref={messagesEndRef} />
             </div>
-
-            <div className="pb-4">
-              <ChatInput
-                onSend={handleSendMessage}
-                disabled={isTyping}
-                placeholder="Share your thoughts..."
-              />
-            </div>
+            <div className="pb-4"><ChatInput onSend={handleSendMessage} disabled={isTyping} placeholder="Share your thoughts..." /></div>
           </>
         )}
       </PageContainer>

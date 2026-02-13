@@ -232,7 +232,17 @@ const AppSettingsPage = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:bell-duotone" className="h-5 w-5 text-muted-foreground" /></div>
-                  <div><p className="font-ui text-foreground">Notifications</p><p className="text-xs text-muted-foreground">Daily reminders to journal</p></div>
+                  <div>
+                    <p className="font-ui text-foreground">Notifications</p>
+                    <p className="text-xs text-muted-foreground">
+                      Daily reminders to journal
+                      {typeof Notification !== "undefined" && (
+                        <span className="ml-1.5">
+                          ({Notification.permission === "granted" ? "✓ Allowed" : Notification.permission === "denied" ? "✗ Blocked" : "Not set"})
+                        </span>
+                      )}
+                    </p>
+                  </div>
                 </div>
                 <Toggle enabled={notifications} onToggle={handleNotificationToggle} />
               </div>

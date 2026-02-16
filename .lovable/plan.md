@@ -1,364 +1,177 @@
 
-# Aramis Comprehensive Update Plan
-## Cellar-Compose Linking, Module Rename, AI Fixes, Auth/Analytics Refinement, Focus Module, Gamification, Offline, RAG, Notifications
+
+# Aramis: AI Fixes, Cellar Overhaul, Settings, Focus Timer, Auth Image
 
 ---
 
-## Overview
+## Root Cause: AI Not Working (Summary Button + Cellar AI)
 
-11 major areas of work, ordered by implementation sequence:
+The `supabase/config.toml` file only contains `project_id` -- it is **missing the edge function declaration** for `chat`. Without `[functions.chat]` in the config, the function is never deployed, so all calls to `/functions/v1/chat` fail silently. This is the single root cause for both:
+- AI Summary button not working in Compose
+- AI chat not working in the Cellar sidebar
 
-1. Database migrations (ai_summary, todos, achievements, points)
-2. Rename "Write" to "Compose" (routes, nav, references)
-3. Cellar click-to-edit linking
-4. Compose fixes (formatting, multi-note, remove toasts, AI summary persistence)
-5. Auth page redesign (split-panel layout matching reference)
-6. Replace Orchard with Focus module (To-Do + Pomodoro)
-7. Insights/Analytics page refinement (dashboard-style matching reference)
-8. Cellar AI and RAG implementation
-9. Gamification system (points + achievements)
-10. Offline mode (PWA enhancement)
-11. Notifications enhancement
+**Fix**: Add the function declaration to `supabase/config.toml`:
+```toml
+[functions.chat]
+verify_jwt = false
+```
+
+Then redeploy the edge function. No code changes needed to `useStreamChat` or the edge function itself -- they are correctly implemented.
 
 ---
 
-## 1. Database Migrations
+## Database Migration
 
-Four schema changes in a single migration:
+Add a `pinned` column and an `ai_category` column to `journal_entries`:
 
 ```sql
--- AI Summary column on journal_entries
-ALTER TABLE public.journal_entries ADD COLUMN IF NOT EXISTS ai_summary TEXT;
-
--- Todos table
-CREATE TABLE public.todos (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  title TEXT NOT NULL,
-  completed BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-ALTER TABLE public.todos ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can manage own todos" ON public.todos FOR ALL TO authenticated
-  USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-
--- Achievements table
-CREATE TABLE public.user_achievements (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  achievement_key TEXT NOT NULL,
-  unlocked_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(user_id, achievement_key)
-);
-ALTER TABLE public.user_achievements ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can manage own achievements" ON public.user_achievements FOR ALL TO authenticated
-  USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-
--- Points column on user_streaks
-ALTER TABLE public.user_streaks ADD COLUMN IF NOT EXISTS total_points INTEGER DEFAULT 0;
+ALTER TABLE public.journal_entries ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT false;
+ALTER TABLE public.journal_entries ADD COLUMN IF NOT EXISTS ai_category TEXT;
 ```
 
 ---
 
-## 2. Rename "Write" to "Compose"
+## Changes by Area
 
-### Files Changed
-- **`src/components/layout/BottomNav.tsx`** -- Change nav item: path `/write` to `/compose`, label "Write" to "Compose"
-- **`src/App.tsx`** -- Change route `path="/write"` to `path="/compose"`
-- **`src/pages/CellarPage.tsx`** -- Update empty-state text referencing "Compose module"
+### 1. Fix AI (config.toml + deploy)
 
----
+**`supabase/config.toml`**: Add `[functions.chat]` with `verify_jwt = false`
 
-## 3. Cellar Click-to-Edit
-
-### `src/components/cellar/ThoughtCard.tsx`
-- Import `useNavigate` from react-router-dom
-- Wrap card in clickable div with `onClick={() => navigate('/compose?entry=' + entry.id)}`
-- Add `cursor-pointer hover:scale-[1.02] transition-transform`
+Deploy the `chat` edge function. This fixes both the Compose AI Summary button and the Cellar AI sidebar.
 
 ---
 
-## 4. Compose Module Fixes
+### 2. Cellar Overhaul -- AI Categorization + Topic Filters + Pinning
 
-### 4.1 Multiple Notes Support (`src/pages/WritePage.tsx`)
-- Add `isNewEntryRef = useRef(false)` flag
-- When "New Entry" is clicked, set `isNewEntryRef.current = true`
-- In auto-save logic: when `isNewEntryRef` is true AND no `selectedEntryId`, always create new entry (skip todayEntry overwrite)
-- After creation, update URL with new entry ID and reset the ref
+**Cellar Figma Reference Analysis:**
+- Large serif "The Cellar" title top-left
+- Centered "Topics" label with a row of rounded gold pill filter buttons
+- 4-column masonry grid of white/cream cards below
+- AI sparkle button top-right
 
-### 4.2 Remove "Saved" Toasts (`src/hooks/useJournal.ts`)
-- Remove `toast.success("Entry saved successfully!")` from `useCreateEntry.onSuccess` (line 123)
-- Remove `toast.success("Entry updated!")` from `useUpdateEntry.onSuccess` (line 157)
-- Keep all error toasts intact
+**New: AI Categorization Edge Function**
 
-### 4.3 Fix Formatting Toolbar (`src/pages/WritePage.tsx`)
-Split `insertFormatting` into two distinct functions:
+Create `supabase/functions/categorize/index.ts`:
+- Accepts all entry content as input
+- Calls Lovable AI with a tool-calling prompt to return structured JSON: `{ entries: [{ id, category }] }`
+- Categories are AI-generated topic labels (e.g., "Personal Growth", "Work", "Relationships", "Health")
+- Returns the mapping so the frontend can group and filter
 
-- **`wrapSelection(prefix, suffix)`** -- For Bold (`**`) and Italic (`*`): wraps selected text or inserts at cursor
-- **`prependLine(prefix)`** -- For Heading (`## `), List (`- `), Quote (`> `): finds the beginning of the current line and prepends the prefix there
+**`src/hooks/useCellarAI.ts`** (new hook):
+- `useCategorizeEntries()` -- Calls the `categorize` edge function with all entries
+- Stores results locally (and persists `ai_category` to each entry in DB)
+- Returns `{ categories: string[], entriesByCategory: Map }`
 
-Update toolbar buttons to call the correct function for each format type.
+**`src/pages/CellarPage.tsx`** changes:
+- Add "Topics" section with horizontally scrollable pill filter buttons
+- "All" pill (default) + one pill per AI-generated category
+- Clicking a pill filters the masonry grid to that category
+- Add "Categorize" button (sparkle icon) that triggers AI categorization
+- Masonry grid grouped by category with section headers when "All" is selected
 
-### 4.4 AI Summary -- Editable and Persisted (`src/pages/WritePage.tsx`)
-- Load `ai_summary` from the current entry when selecting it
-- Make the summary display a `textarea` instead of a `<p>` tag
-- Auto-save summary changes to DB via debounced `updateEntry` with the new `ai_summary` field
-- Update `useUpdateEntry` in `useJournal.ts` to handle the `ai_summary` field
+**`src/components/cellar/ThoughtCard.tsx`** changes:
+- Add a pin icon (toggle) in top-right corner on hover
+- Pinned entries show a subtle pin indicator and sort to the top
+- Category label badge at the bottom of the card
 
----
-
-## 5. Auth Page Redesign
-
-### Design Direction (matching the BrightNest reference image)
-The reference shows a **split-panel layout**:
-- **Left panel**: Warm gradient background with brand name top-left, motivational tagline bottom-left
-- **Right panel**: Clean white card with form fields, clean labels, a prominent dark submit button, "or continue with" social login row, and toggle link at bottom
-
-### Changes to `src/pages/AuthPage.tsx`
-- Replace single centered column with a two-panel `grid grid-cols-1 lg:grid-cols-2` layout
-- **Left panel**: Full-height warm gradient (`bg-gradient-to-br from-amber-100 via-orange-100 to-rose-100`), "Aramis" brand top-left, motivational copy bottom-left ("Get access to your personal hub for clarity and productivity.")
-- **Right panel**: White/card background, clean form with:
-  - Decorative accent icon (sparkle) above title
-  - "Create an account" / "Welcome back" heading
-  - Subtitle text
-  - Clean labeled inputs with border styling (not underline -- matching reference which shows bordered inputs)
-  - Password field with show/hide toggle (Phosphor eye icon)
-  - Dark full-width rounded submit button
-  - "or continue with" divider (placeholder for future OAuth)
-  - Toggle link at bottom ("Already have an account? Sign in")
-- Replace Lucide icons with Phosphor via `@iconify/react`
-- On mobile: stack panels vertically (left panel shorter, right panel full)
+**Pin functionality**:
+- `useTogglePin()` hook -- updates `pinned` column on `journal_entries`
+- Pinned entries always appear first in the grid regardless of filter
 
 ---
 
-## 6. Replace Orchard with Focus Module
+### 3. Settings Module Enhancements
 
-### Remove Orchard
-- Rewrite `src/pages/OrchardPage.tsx` as `FocusPage` content (keep the filename to minimize routing changes, but update the route path)
-- Update `BottomNav.tsx`: change Orchard entry to path `/focus`, label "Focus", icon `ph:timer-duotone`
-- Update `App.tsx`: change route from `/orchard` to `/focus`
-- Remove Three.js/R3F Canvas code entirely from the page
+**`src/pages/AppSettingsPage.tsx`** additions:
 
-### New Components
+New sections to add:
 
-**`src/components/focus/PomodoroTimer.tsx`**
-- Circular SVG progress ring (radius ~120, stroke-dasharray animation)
-- 25-minute work / 5-minute break cycles
-- States: idle, running, paused, break
-- Start/Pause/Reset button controls
-- Session counter display
-- Notification on timer completion
-- GSAP animation for timer state transitions
+**Focus Timer Settings** (new section):
+- Work duration selector: 15 / 25 / 30 / 45 / 60 minutes (pill buttons)
+- Break duration selector: 5 / 10 / 15 minutes
+- Long break duration: 15 / 20 / 30 minutes
+- Sessions before long break: 3 / 4 / 5
+- Store in localStorage (no DB needed)
 
-**`src/components/focus/TodoList.tsx`**
-- Add task input with rounded pill + plus button
-- List of `TodoItem` components
-- Empty state message
+**Account section** (new):
+- Email display (read-only)
+- Change password link
+- Sign out button
 
-**`src/components/focus/TodoItem.tsx`**
-- Checkbox (Phosphor icon), title text, delete button
-- Completed tasks: strikethrough + reduced opacity
-- Slide-in animation on creation, fade-out on deletion
+**Privacy section** (new):
+- Link to Privacy page (already exists at `/privacy`)
 
-**`src/hooks/useTodos.ts`**
-- `useTodos()` -- Fetch all todos for current user, ordered by created_at desc
-- `useCreateTodo()` -- Insert new todo
-- `useToggleTodo()` -- Toggle completed status
-- `useDeleteTodo()` -- Delete todo
-
-### Focus Page Layout
-```text
-+------------------------------------------+
-|  Focus                                   |
-+------------------------------------------+
-|  [Large Pomodoro Timer Ring]             |
-|  25:00                                   |
-|  [Start]  [Reset]                        |
-|  Sessions: 3                             |
-+------------------------------------------+
-|  Tasks                        [+ input]  |
-|  [ ] Task 1                      [x]     |
-|  [x] Task 2 (strikethrough)     [x]     |
-+------------------------------------------+
-```
+Reorder sections: Writing, Focus, Experience, Notifications, Appearance, Data, Account, Privacy, About
 
 ---
 
-## 7. Insights/Analytics Page Refinement
+### 4. Variable Time on Focus (Pomodoro Timer)
 
-### Design Direction (matching the Karla dashboard reference)
-The reference shows:
-- Dark glass cards in a horizontal row (4 stat cards) with mini sparkline charts and metadata
-- A large area chart below with time-range toggle pills (7d / 30d)
-- Side promotional cards
+**`src/components/focus/PomodoroTimer.tsx`** changes:
+- Accept `workDuration`, `breakDuration` props (with defaults 25/5)
+- Read settings from localStorage on mount
+- Add a settings gear icon that opens an inline duration picker
+- Duration picker: preset pills (15, 25, 30, 45, 60 min for work; 5, 10, 15 for break)
+- Custom input field for arbitrary minutes
+- When duration changes, reset the timer
 
-### Adapted for Aramis
-- **Top row**: 4 stat cards in `grid-cols-2 lg:grid-cols-4` -- each card is a glass-card with:
-  - Small label (e.g., "Today's Words", "This Week", "This Month", "All Time")
-  - Large number value
-  - Mini sparkline or trend indicator
-  - Date range and entry count metadata at bottom
-- **Main chart section**: Large AreaChart (word count over time, last 30 days) with 7d/30d toggle pills
-- **Secondary row**: Side-by-side `grid-cols-1 lg:grid-cols-2`:
-  - BarChart (Entries Per Week)
-  - Mood trend AreaChart
-- **Bottom section**: Monthly progress card with progress bar
-- **New data calculations**:
-  - Total words per day (for word count chart)
-  - Most active writing day of week
-  - Day-of-week activity breakdown
-
-### Changes to `src/pages/InsightsPage.tsx`
-- Add word count trend data (aggregate `word_count` per day from entries)
-- Add most active day calculation
-- Restructure grid for dashboard-style layout
-- Add mini sparklines in stat cards using small inline Recharts
-- Polish filter chips with pill shape (`rounded-full`)
+**`src/pages/OrchardPage.tsx`** (FocusPage) changes:
+- Read timer settings from localStorage
+- Pass them to `PomodoroTimer`
 
 ---
 
-## 8. AI RAG (Retrieval-Augmented Generation)
+### 5. Auth Page -- Add Uploaded Image
 
-### Edge Function Update (`supabase/functions/chat/index.ts`)
-- Accept optional `context` field in request body
-- If present, prepend to system prompt: "Here are the user's recent journal entries for reference:\n\n{context}"
+Copy the uploaded sunset image to `src/assets/auth-bg.jpg`.
 
-### Frontend Changes
-
-**`src/hooks/useStreamChat.ts`**
-- Add optional `context?: string` to `StreamChatOptions`
-- Include `context` in request body when present
-
-**`src/pages/HomePage.tsx`**
-- Import `useJournalEntries`
-- Before sending chat messages, build a condensed context string from recent entries (titles + first 100 chars, last 20 entries)
-- Pass as `context` parameter to `streamChat`
-
-**`src/components/cellar/CellarAISidebar.tsx`**
-- Refactor to pass journal entries as `context` field instead of injecting as a fake user message
-- Remove the `buildSystemPrompt` function that prepends entries as a user message
-- Instead, pass the entries context string via the `context` parameter
+**`src/pages/AuthPage.tsx`** changes:
+- Import the image: `import authBg from "@/assets/auth-bg.jpg"`
+- Replace the CSS gradient on the left panel with the image as a background
+- Use `style={{ backgroundImage: \`url(\${authBg})\`, backgroundSize: "cover", backgroundPosition: "center" }}`
+- Add a dark overlay gradient for text readability: `bg-gradient-to-t from-black/60 via-transparent to-black/30`
+- Keep the "Aramis" brand and tagline text over the image (white text)
 
 ---
 
-## 9. Gamification System
+### 6. Compose AI Summary Fix (already fixed by config.toml)
 
-### New Hooks
+The `handleGenerateSummary` function in `WritePage.tsx` is correctly implemented. It calls `streamChat` which hits `/functions/v1/chat`. Once the edge function is deployed via the config fix, this will work.
 
-**`src/hooks/useAchievements.ts`**
-- `useAchievements()` -- Fetch user's unlocked achievements
-- `useUnlockAchievement()` -- Insert new achievement (idempotent via unique constraint)
-
-**`src/hooks/useGamification.ts`**
-- `useAwardPoints(amount)` -- Increment `total_points` on `user_streaks`
-- `useCheckAchievements()` -- Check conditions and unlock achievements
-- Achievement definitions (key, name, condition, icon):
-  - `first_words` -- Write first entry
-  - `week_warrior` -- 7-day streak
-  - `centurion` -- 100 entries
-  - `marathon_writer` -- 1000+ words in one entry
-  - `night_owl` -- Write after 10 PM
-  - `early_bird` -- Write before 7 AM
-  - `focused_mind` -- Complete 5 pomodoros in a day
-  - `task_master` -- Complete 10 tasks
-
-### Points Integration
-- In `WritePage.tsx` auto-save: award +10 points on new entry, +5 bonus for 100+ words, +15 for 500+
-- In `PomodoroTimer.tsx`: award +8 points on session completion
-- In `TodoItem.tsx`: award +3 points on task completion
-
-### Display
-- **`src/pages/ProfilePage.tsx`**: Add points display and achievement badges section
-- **`src/pages/InsightsPage.tsx`**: Add total points at bottom
+One additional improvement: the `useUpdateEntry` mutation uses `...input` spread which passes `ai_summary` through correctly since the DB schema already supports it. No code changes needed here.
 
 ---
 
-## 10. Offline Mode
-
-### PWA Enhancement (`vite.config.ts`)
-- Add `runtimeCaching` configuration for Supabase API calls using `NetworkFirst` strategy
-- Add `navigateFallback: '/index.html'`
-- Add `navigateFallbackDenylist: [/^\/~oauth/]` for OAuth compatibility
-
-### New File: `src/lib/offlineQueue.ts`
-- Queue mutations in `localStorage` when `navigator.onLine === false`
-- On `online` event, flush queued mutations
-- Wrapper function for Supabase mutations
-
-### New Component: `src/components/layout/OfflineBanner.tsx`
-- Subtle top banner showing "You're offline. Changes will sync when reconnected."
-- GSAP slide-in/out animation
-
-### `src/App.tsx`
-- Add `online`/`offline` event listeners
-- Render `OfflineBanner` conditionally
-
----
-
-## 11. Notifications Enhancement
-
-### `src/lib/notifications.ts`
-- Add `tag: 'aramis-reminder'` to prevent duplicate notifications
-- Use service worker registration (`navigator.serviceWorker.ready`) when available
-- Add permission status check function for Settings display
-
-### `src/pages/AppSettingsPage.tsx`
-- Show notification permission status (granted/denied/default)
-- Add visual indicator next to toggle
-
----
-
-## Files Summary
-
-### New Files
+## New Files
 
 | File | Purpose |
 |------|---------|
-| `src/hooks/useTodos.ts` | CRUD hooks for todos table |
-| `src/hooks/useAchievements.ts` | Achievement tracking hooks |
-| `src/hooks/useGamification.ts` | Points system and achievement checks |
-| `src/lib/offlineQueue.ts` | Offline mutation queue |
-| `src/components/focus/PomodoroTimer.tsx` | Circular countdown timer |
-| `src/components/focus/TodoList.tsx` | To-do list component |
-| `src/components/focus/TodoItem.tsx` | Individual todo item |
-| `src/components/layout/OfflineBanner.tsx` | Offline status indicator |
+| `supabase/functions/categorize/index.ts` | AI categorization edge function using tool calling |
+| `src/hooks/useCellarAI.ts` | Hook for triggering and consuming AI categorization |
+| `src/assets/auth-bg.jpg` | Uploaded sunset image for auth left panel |
 
-### Modified Files
+## Modified Files
 
 | File | Changes |
 |------|---------|
-| `src/pages/WritePage.tsx` | Fix formatting, multi-note, AI summary persistence |
-| `src/hooks/useJournal.ts` | Remove success toasts, add ai_summary support |
-| `src/components/cellar/ThoughtCard.tsx` | Click-to-navigate to Compose |
-| `src/pages/CellarPage.tsx` | Update empty state text |
-| `src/components/layout/BottomNav.tsx` | Rename Write to Compose, Orchard to Focus |
-| `src/App.tsx` | Update routes, add offline listener, offline banner |
-| `src/pages/AuthPage.tsx` | Complete redesign with split-panel layout |
-| `src/pages/InsightsPage.tsx` | Dashboard-style layout with stat cards and charts |
-| `src/pages/OrchardPage.tsx` | Complete rewrite as Focus page (Pomodoro + Todos) |
-| `src/pages/AppSettingsPage.tsx` | Notification status indicator |
-| `src/pages/HomePage.tsx` | Pass journal context for RAG |
-| `src/hooks/useStreamChat.ts` | Accept context parameter |
-| `supabase/functions/chat/index.ts` | Accept and use context field for RAG |
-| `src/components/cellar/CellarAISidebar.tsx` | Use context field instead of fake user message |
-| `vite.config.ts` | Enhanced PWA offline caching |
-| `src/pages/ProfilePage.tsx` | Points and achievements display |
-| `src/lib/notifications.ts` | Tag deduplication, SW integration |
-
----
+| `supabase/config.toml` | Add `[functions.chat]` and `[functions.categorize]` declarations |
+| `src/pages/CellarPage.tsx` | Topics filter bar, AI categorize button, grouped masonry, pin sorting |
+| `src/components/cellar/ThoughtCard.tsx` | Pin toggle, category badge |
+| `src/hooks/useJournal.ts` | Add `useTogglePin` mutation, update JournalEntry type for `pinned` and `ai_category` |
+| `src/pages/AppSettingsPage.tsx` | Focus timer settings, Account section, Privacy link |
+| `src/components/focus/PomodoroTimer.tsx` | Variable duration props, inline settings picker |
+| `src/pages/OrchardPage.tsx` | Read timer settings, pass to PomodoroTimer |
+| `src/pages/AuthPage.tsx` | Replace gradient with uploaded image background |
 
 ## Implementation Order
 
-1. Database migrations (ai_summary, todos, achievements, points)
-2. Rename Write to Compose (routes, nav)
-3. Cellar click-to-edit linking
-4. Compose fixes (formatting, multi-note, remove toasts, AI summary)
-5. Auth page redesign (split-panel matching reference)
-6. Replace Orchard with Focus (Pomodoro + To-Do)
-7. Insights page refinement (dashboard layout matching reference)
-8. RAG implementation (edge function + frontend context passing)
-9. Gamification system (hooks, points, achievements, profile display)
-10. Offline mode (PWA caching, queue, banner)
-11. Notifications enhancement
-12. Deploy edge function and end-to-end testing
+1. Database migration (pinned, ai_category columns)
+2. Fix `supabase/config.toml` and deploy edge functions
+3. Copy auth image asset
+4. Auth page image update
+5. Cellar AI categorization (new edge function + hook + UI)
+6. Cellar pin functionality
+7. Variable timer in Focus
+8. Settings module expansion
+9. End-to-end testing of AI features
+

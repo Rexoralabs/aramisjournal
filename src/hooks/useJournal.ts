@@ -16,6 +16,9 @@ export interface JournalEntry {
   entry_date: string;
   created_at: string;
   updated_at: string;
+  ai_summary: string | null;
+  ai_category: string | null;
+  pinned: boolean;
 }
 
 export interface CreateEntryInput {
@@ -120,7 +123,6 @@ export function useCreateEntry() {
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["today-entry"] });
       queryClient.invalidateQueries({ queryKey: ["user-streaks"] });
-      // Silent save - no toast
     },
     onError: (error) => {
       toast.error("Failed to save entry: " + error.message);
@@ -132,7 +134,7 @@ export function useUpdateEntry() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...input }: Partial<CreateEntryInput> & { id: string }) => {
+    mutationFn: async ({ id, ...input }: Partial<CreateEntryInput> & { id: string; ai_summary?: string }) => {
       const wordCount = input.content 
         ? input.content.split(/\s+/).filter(Boolean).length 
         : undefined;
@@ -154,7 +156,6 @@ export function useUpdateEntry() {
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["today-entry"] });
       queryClient.invalidateQueries({ queryKey: ["journal-entry"] });
-      // Silent save - no toast
     },
     onError: (error) => {
       toast.error("Failed to update entry: " + error.message);
@@ -181,6 +182,27 @@ export function useDeleteEntry() {
     },
     onError: (error) => {
       toast.error("Failed to delete entry: " + error.message);
+    },
+  });
+}
+
+export function useTogglePin() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, pinned }: { id: string; pinned: boolean }) => {
+      const { error } = await supabase
+        .from("journal_entries")
+        .update({ pinned })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+    },
+    onError: (error) => {
+      toast.error("Failed to update pin: " + error.message);
     },
   });
 }

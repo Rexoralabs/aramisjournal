@@ -99,6 +99,7 @@ export type Database = {
       }
       journal_entries: {
         Row: {
+          ai_category: string | null
           ai_mood_analysis: Json | null
           ai_summary: string | null
           content: string
@@ -106,6 +107,7 @@ export type Database = {
           entry_date: string
           id: string
           mood: string | null
+          pinned: boolean | null
           prompt_used: string | null
           title: string | null
           updated_at: string
@@ -113,6 +115,7 @@ export type Database = {
           word_count: number | null
         }
         Insert: {
+          ai_category?: string | null
           ai_mood_analysis?: Json | null
           ai_summary?: string | null
           content: string
@@ -120,6 +123,7 @@ export type Database = {
           entry_date?: string
           id?: string
           mood?: string | null
+          pinned?: boolean | null
           prompt_used?: string | null
           title?: string | null
           updated_at?: string
@@ -127,6 +131,7 @@ export type Database = {
           word_count?: number | null
         }
         Update: {
+          ai_category?: string | null
           ai_mood_analysis?: Json | null
           ai_summary?: string | null
           content?: string
@@ -134,6 +139,7 @@ export type Database = {
           entry_date?: string
           id?: string
           mood?: string | null
+          pinned?: boolean | null
           prompt_used?: string | null
           title?: string | null
           updated_at?: string

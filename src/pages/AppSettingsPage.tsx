@@ -5,20 +5,14 @@ import gsap from "gsap";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { useUserProfile, useUpdateProfile } from "@/hooks/useProfile";
 import { useJournalEntries, useDeleteEntry } from "@/hooks/useJournal";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { haptic, setHapticsEnabled, isHapticsEnabled } from "@/lib/haptics";
 import { soundManager } from "@/lib/sounds";
 import { requestNotificationPermission, scheduleDailyReminder, stopDailyReminder } from "@/lib/notifications";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 const fontSizeOptions = [
@@ -40,8 +34,22 @@ const accentColors = [
   { value: "ocean", label: "Ocean", color: "hsl(210 70% 50%)" },
 ];
 
+const workPresets = [15, 25, 30, 45, 60];
+const breakPresets = [5, 10, 15];
+
+const TIMER_STORAGE_KEY = "aramis-timer-settings";
+
+function getTimerSettings() {
+  try {
+    const s = localStorage.getItem(TIMER_STORAGE_KEY);
+    if (s) return JSON.parse(s);
+  } catch {}
+  return { workMinutes: 25, breakMinutes: 5 };
+}
+
 const AppSettingsPage = () => {
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const { data: profile } = useUserProfile();
   const updateProfile = useUpdateProfile();
   const { data: entries = [] } = useJournalEntries();
@@ -54,6 +62,10 @@ const AppSettingsPage = () => {
   const [hapticsEnabled, setHapticsEnabledState] = useState(true);
   const [writingGoal, setWritingGoal] = useState(250);
   const [selectedAccent, setSelectedAccent] = useState("gold");
+
+  const timerSettings = getTimerSettings();
+  const [workMinutes, setWorkMinutes] = useState(timerSettings.workMinutes);
+  const [breakMinutes, setBreakMinutes] = useState(timerSettings.breakMinutes);
 
   useLayoutEffect(() => {
     if (containerRef.current) {
@@ -121,6 +133,23 @@ const AppSettingsPage = () => {
     toast.success("All entries deleted");
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/auth");
+  };
+
+  const updateTimerWork = (mins: number) => {
+    setWorkMinutes(mins);
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify({ workMinutes: mins, breakMinutes }));
+    haptic("light");
+  };
+
+  const updateTimerBreak = (mins: number) => {
+    setBreakMinutes(mins);
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify({ workMinutes, breakMinutes: mins }));
+    haptic("light");
+  };
+
   const estimatedSize = entries.reduce((acc, e) => acc + (e.content?.length || 0), 0);
   const sizeKB = Math.round(estimatedSize / 1024);
 
@@ -148,14 +177,10 @@ const AppSettingsPage = () => {
         <div className="space-y-1">
           <h2 className="text-xs font-ui text-muted-foreground uppercase tracking-wider px-1">Writing</h2>
           <div className="space-y-3">
-            {/* Font Size */}
             <div className="glass-card p-5">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 rounded-lg bg-muted"><span className="text-lg">Aa</span></div>
-                <div>
-                  <p className="font-ui text-foreground">Font Size</p>
-                  <p className="text-xs text-muted-foreground">Adjust text size</p>
-                </div>
+                <div><p className="font-ui text-foreground">Font Size</p><p className="text-xs text-muted-foreground">Adjust text size</p></div>
               </div>
               <div className="flex gap-2">
                 {fontSizeOptions.map((o) => (
@@ -166,21 +191,51 @@ const AppSettingsPage = () => {
                 ))}
               </div>
             </div>
-
-            {/* Writing Goal */}
             <div className="glass-card p-5">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:target-duotone" className="h-5 w-5 text-muted-foreground" /></div>
-                <div>
-                  <p className="font-ui text-foreground">Daily Writing Goal</p>
-                  <p className="text-xs text-muted-foreground">Words per day target</p>
-                </div>
+                <div><p className="font-ui text-foreground">Daily Writing Goal</p><p className="text-xs text-muted-foreground">Words per day target</p></div>
               </div>
               <div className="flex gap-2">
                 {writingGoalOptions.map((o) => (
                   <button key={o.value} onClick={() => { setWritingGoal(o.value); haptic("light"); }}
                     className={`flex-1 py-2 px-4 rounded-lg font-ui text-sm transition-all ${writingGoal === o.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
                     {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Focus Timer Section */}
+        <div className="space-y-1">
+          <h2 className="text-xs font-ui text-muted-foreground uppercase tracking-wider px-1">Focus Timer</h2>
+          <div className="space-y-3">
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:timer-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+                <div><p className="font-ui text-foreground">Work Duration</p><p className="text-xs text-muted-foreground">Minutes per focus session</p></div>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {workPresets.map(m => (
+                  <button key={m} onClick={() => updateTimerWork(m)}
+                    className={`px-4 py-2 rounded-full font-ui text-sm transition-all ${workMinutes === m ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    {m} min
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:coffee-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+                <div><p className="font-ui text-foreground">Break Duration</p><p className="text-xs text-muted-foreground">Minutes per break</p></div>
+              </div>
+              <div className="flex gap-2">
+                {breakPresets.map(m => (
+                  <button key={m} onClick={() => updateTimerBreak(m)}
+                    className={`px-4 py-2 rounded-full font-ui text-sm transition-all ${breakMinutes === m ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    {m} min
                   </button>
                 ))}
               </div>
@@ -210,17 +265,6 @@ const AppSettingsPage = () => {
                 <Toggle enabled={hapticsEnabled} onToggle={handleHapticsToggle} />
               </div>
             </div>
-            <div className="glass-card p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:sparkle-duotone" className="h-5 w-5 text-muted-foreground" /></div>
-                  <div><p className="font-ui text-foreground">AI Prompts</p><p className="text-xs text-muted-foreground">Daily writing suggestions</p></div>
-                </div>
-                <button className="relative h-6 w-11 rounded-full bg-primary touch-target">
-                  <div className="absolute top-1 translate-x-6 h-4 w-4 rounded-full bg-white shadow-sm" />
-                </button>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -246,15 +290,6 @@ const AppSettingsPage = () => {
                 </div>
                 <Toggle enabled={notifications} onToggle={handleNotificationToggle} />
               </div>
-            </div>
-            <div className="glass-card p-5">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:clock-duotone" className="h-5 w-5 text-muted-foreground" /></div>
-                <div><p className="font-ui text-foreground">Daily Reminder</p><p className="text-xs text-muted-foreground">Set your preferred time</p></div>
-              </div>
-              <button className="w-full mt-3 py-2 px-4 rounded-lg bg-muted text-muted-foreground font-ui text-sm">
-                9:00 PM (Coming soon)
-              </button>
             </div>
           </div>
         </div>
@@ -284,11 +319,9 @@ const AppSettingsPage = () => {
           <h2 className="text-xs font-ui text-muted-foreground uppercase tracking-wider px-1">Data</h2>
           <div className="space-y-3">
             <div className="glass-card p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:database-duotone" className="h-5 w-5 text-muted-foreground" /></div>
-                  <div><p className="font-ui text-foreground">Storage</p><p className="text-xs text-muted-foreground">{entries.length} entries · ~{sizeKB} KB</p></div>
-                </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:database-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+                <div><p className="font-ui text-foreground">Storage</p><p className="text-xs text-muted-foreground">{entries.length} entries · ~{sizeKB} KB</p></div>
               </div>
             </div>
             <div className="glass-card p-5">
@@ -317,6 +350,31 @@ const AppSettingsPage = () => {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+          </div>
+        </div>
+
+        {/* Account Section */}
+        <div className="space-y-1">
+          <h2 className="text-xs font-ui text-muted-foreground uppercase tracking-wider px-1">Account</h2>
+          <div className="space-y-3">
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:envelope-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+                <div><p className="font-ui text-foreground">Email</p><p className="text-xs text-muted-foreground">{user?.email || "Not signed in"}</p></div>
+              </div>
+            </div>
+            <div className="glass-card p-5">
+              <button onClick={() => navigate("/privacy")} className="w-full flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:shield-check-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+                <div className="text-left"><p className="font-ui text-foreground">Privacy & Security</p><p className="text-xs text-muted-foreground">Manage your privacy settings</p></div>
+              </button>
+            </div>
+            <div className="glass-card p-5">
+              <button onClick={handleSignOut} className="w-full flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-destructive/10"><Icon icon="ph:sign-out-duotone" className="h-5 w-5 text-destructive" /></div>
+                <div className="text-left"><p className="font-ui text-destructive">Sign Out</p><p className="text-xs text-muted-foreground">Log out of your account</p></div>
+              </button>
+            </div>
           </div>
         </div>
 

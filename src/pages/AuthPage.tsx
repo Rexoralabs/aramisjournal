@@ -4,6 +4,7 @@ import { Icon } from "@iconify/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import gsap from "gsap";
+import authBg from "@/assets/auth-bg.jpg";
 
 type AuthMode = "login" | "signup";
 
@@ -47,18 +48,22 @@ const AuthPage = () => {
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
-      {/* Left Panel — Brand */}
+      {/* Left Panel — Image Background */}
       <div
         ref={leftRef}
-        className="relative hidden lg:flex flex-col justify-between p-10"
-        style={{ background: "linear-gradient(135deg, hsl(40 30% 92%), hsl(35 40% 88%), hsl(30 35% 85%))" }}
+        className="relative hidden lg:flex flex-col justify-between p-10 overflow-hidden"
       >
-        <h1 className="text-2xl font-brand tracking-widest text-foreground">Aramis</h1>
-        <div className="max-w-sm">
-          <p className="font-emphasis text-2xl text-foreground/80 leading-relaxed">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${authBg})` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30" />
+        <h1 className="relative z-10 text-2xl font-brand tracking-widest text-white">Aramis</h1>
+        <div className="relative z-10 max-w-sm">
+          <p className="font-emphasis text-2xl text-white/90 leading-relaxed">
             "Get access to your personal hub for clarity, reflection, and productivity."
           </p>
-          <p className="text-sm font-ui text-muted-foreground mt-4">Where silence meets reflection</p>
+          <p className="text-sm font-ui text-white/60 mt-4">Where silence meets reflection</p>
         </div>
       </div>
 

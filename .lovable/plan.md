@@ -1,177 +1,238 @@
 
 
-# Aramis: AI Fixes, Cellar Overhaul, Settings, Focus Timer, Auth Image
+# Aramis: Desktop-First Overhaul, Liquid Glass Design, AI Fixes, Rich Text, Timer Background Mode
 
 ---
 
-## Root Cause: AI Not Working (Summary Button + Cellar AI)
+## Overview
 
-The `supabase/config.toml` file only contains `project_id` -- it is **missing the edge function declaration** for `chat`. Without `[functions.chat]` in the config, the function is never deployed, so all calls to `/functions/v1/chat` fail silently. This is the single root cause for both:
-- AI Summary button not working in Compose
-- AI chat not working in the Cellar sidebar
-
-**Fix**: Add the function declaration to `supabase/config.toml`:
-```toml
-[functions.chat]
-verify_jwt = false
-```
-
-Then redeploy the edge function. No code changes needed to `useStreamChat` or the edge function itself -- they are correctly implemented.
+9 major changes, reorienting the app from mobile-first to a **desktop-first overlay/companion app** with premium Apple-inspired design.
 
 ---
 
-## Database Migration
+## 1. Auth Image -- Full-Fit High Quality
 
-Add a `pinned` column and an `ai_category` column to `journal_entries`:
-
-```sql
-ALTER TABLE public.journal_entries ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT false;
-ALTER TABLE public.journal_entries ADD COLUMN IF NOT EXISTS ai_category TEXT;
-```
+**`src/pages/AuthPage.tsx`**: The left panel image uses `bg-cover bg-center` but may not fill properly. Fix:
+- Add `object-cover w-full h-full` to ensure the image fills 100% of the panel
+- Use a dedicated `<img>` element with `object-cover` instead of CSS `backgroundImage` for sharper rendering
+- Remove the `hidden lg:flex` and ensure mobile also gets a compact version of the image
 
 ---
 
-## Changes by Area
+## 2. Splash Screen -- Show Only Once (First Visit)
 
-### 1. Fix AI (config.toml + deploy)
+**`src/App.tsx`**: Currently `showSplash` defaults to `true` every page load.
 
-**`supabase/config.toml`**: Add `[functions.chat]` with `verify_jwt = false`
-
-Deploy the `chat` edge function. This fixes both the Compose AI Summary button and the Cellar AI sidebar.
-
----
-
-### 2. Cellar Overhaul -- AI Categorization + Topic Filters + Pinning
-
-**Cellar Figma Reference Analysis:**
-- Large serif "The Cellar" title top-left
-- Centered "Topics" label with a row of rounded gold pill filter buttons
-- 4-column masonry grid of white/cream cards below
-- AI sparkle button top-right
-
-**New: AI Categorization Edge Function**
-
-Create `supabase/functions/categorize/index.ts`:
-- Accepts all entry content as input
-- Calls Lovable AI with a tool-calling prompt to return structured JSON: `{ entries: [{ id, category }] }`
-- Categories are AI-generated topic labels (e.g., "Personal Growth", "Work", "Relationships", "Health")
-- Returns the mapping so the frontend can group and filter
-
-**`src/hooks/useCellarAI.ts`** (new hook):
-- `useCategorizeEntries()` -- Calls the `categorize` edge function with all entries
-- Stores results locally (and persists `ai_category` to each entry in DB)
-- Returns `{ categories: string[], entriesByCategory: Map }`
-
-**`src/pages/CellarPage.tsx`** changes:
-- Add "Topics" section with horizontally scrollable pill filter buttons
-- "All" pill (default) + one pill per AI-generated category
-- Clicking a pill filters the masonry grid to that category
-- Add "Categorize" button (sparkle icon) that triggers AI categorization
-- Masonry grid grouped by category with section headers when "All" is selected
-
-**`src/components/cellar/ThoughtCard.tsx`** changes:
-- Add a pin icon (toggle) in top-right corner on hover
-- Pinned entries show a subtle pin indicator and sort to the top
-- Category label badge at the bottom of the card
-
-**Pin functionality**:
-- `useTogglePin()` hook -- updates `pinned` column on `journal_entries`
-- Pinned entries always appear first in the grid regardless of filter
+Fix:
+- On mount, check `localStorage.getItem("aramis-splash-seen")`
+- If set, skip splash entirely (`showSplash = false`)
+- In `handleSplashComplete`, set `localStorage.setItem("aramis-splash-seen", "true")`
+- This ensures the splash only shows on the very first visit
 
 ---
 
-### 3. Settings Module Enhancements
+## 3. Rich Text Formatting (Markdown Rendering)
 
-**`src/pages/AppSettingsPage.tsx`** additions:
+**Current**: Compose stores markdown (`**bold**`, `*italic*`) but renders as plain text. The toolbar inserts markdown syntax but users never see formatted output.
 
-New sections to add:
+**Fix -- Render markdown in preview areas** (Cellar cards, AI summary, entry previews):
+- Install and use a lightweight markdown renderer (`react-markdown` is not installed, but we can use a simple regex-based renderer or install it)
+- Actually, the simpler approach: convert the `textarea` to use `contenteditable` with basic formatting commands (`document.execCommand`), or keep the textarea + markdown but add a **live preview pane** below.
 
-**Focus Timer Settings** (new section):
-- Work duration selector: 15 / 25 / 30 / 45 / 60 minutes (pill buttons)
-- Break duration selector: 5 / 10 / 15 minutes
-- Long break duration: 15 / 20 / 30 minutes
-- Sessions before long break: 3 / 4 / 5
-- Store in localStorage (no DB needed)
+**Recommended approach**: Keep `textarea` for input with markdown syntax, but in all **display** contexts (ThoughtCard, EntryPreview, AI Summary, Calendar preview), render the markdown to styled HTML using a small utility function that converts `**bold**` → `<strong>`, `*italic*` → `<em>`, `## heading` → `<h2>`, `- item` → `<li>`, `> quote` → `<blockquote>`.
 
-**Account section** (new):
-- Email display (read-only)
-- Change password link
-- Sign out button
+Create `src/lib/markdown.ts`:
+- `renderMarkdown(text: string): string` -- converts markdown syntax to HTML
+- Uses regex replacements for bold, italic, headings, lists, blockquotes
+- Sanitizes output (no script injection)
 
-**Privacy section** (new):
-- Link to Privacy page (already exists at `/privacy`)
-
-Reorder sections: Writing, Focus, Experience, Notifications, Appearance, Data, Account, Privacy, About
+Update display components:
+- `ThoughtCard.tsx` -- render preview with `dangerouslySetInnerHTML` using the markdown renderer
+- `EntryPreview.tsx` -- same
+- `WritePage.tsx` AI summary display -- same
 
 ---
 
-### 4. Variable Time on Focus (Pomodoro Timer)
+## 4. Timer Background Mode + Ambient Chime
 
-**`src/components/focus/PomodoroTimer.tsx`** changes:
-- Accept `workDuration`, `breakDuration` props (with defaults 25/5)
-- Read settings from localStorage on mount
-- Add a settings gear icon that opens an inline duration picker
-- Duration picker: preset pills (15, 25, 30, 45, 60 min for work; 5, 10, 15 for break)
-- Custom input field for arbitrary minutes
-- When duration changes, reset the timer
+**Problem**: The `setInterval` in PomodoroTimer stops when the tab is hidden (browser throttles timers).
 
-**`src/pages/OrchardPage.tsx`** (FocusPage) changes:
-- Read timer settings from localStorage
-- Pass them to `PomodoroTimer`
+**Fix in `src/components/focus/PomodoroTimer.tsx`**:
+- Replace `setInterval` countdown with a **target end time** approach:
+  - When starting, calculate `endTime = Date.now() + timeLeft * 1000` and store it in a ref
+  - Use `setInterval` at 1000ms that computes `remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000))`
+  - This way, even if the tab was backgrounded and the interval was throttled, when it fires again it calculates the correct remaining time
+- Add `visibilitychange` event listener to immediately recalculate on tab return
 
----
-
-### 5. Auth Page -- Add Uploaded Image
-
-Copy the uploaded sunset image to `src/assets/auth-bg.jpg`.
-
-**`src/pages/AuthPage.tsx`** changes:
-- Import the image: `import authBg from "@/assets/auth-bg.jpg"`
-- Replace the CSS gradient on the left panel with the image as a background
-- Use `style={{ backgroundImage: \`url(\${authBg})\`, backgroundSize: "cover", backgroundPosition: "center" }}`
-- Add a dark overlay gradient for text readability: `bg-gradient-to-t from-black/60 via-transparent to-black/30`
-- Keep the "Aramis" brand and tagline text over the image (white text)
+**Ambient chime sound** in `src/lib/sounds.ts`:
+- Add a new `SoundEffect` type: `'chime'`
+- Synthesize a gentle ambient chime: two overlapping sine tones (C5 + G5) with longer duration (0.8s) and gentle fade
+- Play `soundManager.play('chime')` when timer completes instead of the basic `success` sound
 
 ---
 
-### 6. Compose AI Summary Fix (already fixed by config.toml)
+## 5. Fix Cellar AI Chat
 
-The `handleGenerateSummary` function in `WritePage.tsx` is correctly implemented. It calls `streamChat` which hits `/functions/v1/chat`. Once the edge function is deployed via the config fix, this will work.
+**Root cause**: `supabase/config.toml` only has `project_id` -- the `[functions.chat]` and `[functions.categorize]` declarations are missing. Without these, the edge functions are never deployed.
 
-One additional improvement: the `useUpdateEntry` mutation uses `...input` spread which passes `ai_summary` through correctly since the DB schema already supports it. No code changes needed here.
+**Fix**: The config.toml is auto-managed and cannot be edited directly. Instead, deploy the edge functions using the deploy tool.
+
+**Action**: Deploy `chat` and `categorize` edge functions using the `supabase--deploy_edge_functions` tool.
+
+Additionally, verify the `CellarAISidebar` correctly passes the `context` parameter (it does -- line 83-85 already pass `context` to `streamChat`).
 
 ---
 
-## New Files
+## 6. Liquid Glass + Apple Premium Design with GSAP
+
+Transform the UI components to have a frosted glass, depth-layered, Apple-inspired feel.
+
+### Glass Effects (`src/index.css`):
+- Update `.glass-card` to use stronger `backdrop-blur-2xl` (40px), subtler borders with `border-white/10` in dark mode, and inner glow via `box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.05)`
+- Add `.glass-liquid` class: `backdrop-blur-[40px] bg-white/[0.06] dark:bg-white/[0.04] border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.06)]`
+- Add subtle gradient overlays for depth
+
+### GSAP Micro-interactions:
+- Cards: on hover, GSAP `scale(1.02)` + subtle `boxShadow` expansion + `y: -2`
+- Navigation items: GSAP spring animation on active state change
+- Page transitions: already using GSAP blur fade -- enhance with `scale: 0.98 → 1`
+- Buttons: `scale: 0.95` on press via GSAP
+
+### Component-level changes:
+- All `glass-card` usages get the enhanced frosted treatment
+- Navigation pill gets stronger blur + border glow on active
+- Chat bubbles get subtle glass treatment
+- Modal/sidebar overlays get stronger frosted backdrop
+
+**No Lottie files** -- they would add significant bundle size and complexity. GSAP micro-animations achieve the same premium feel more efficiently.
+
+---
+
+## 7. Replace Serif Fonts with Instrument Sans
+
+**Current**: Headings use `Instrument Serif` (`font-serif`). User wants all serif replaced with `Instrument Sans`.
+
+### Changes:
+
+**`src/index.css`**:
+- Change `h1, h2, h3, h4, h5, h6` font-family from `'Instrument Serif'` to `'Instrument Sans'`
+- Update `.font-serif` utility to use `'Instrument Sans'` (or remove the serif distinction entirely)
+- Keep `font-brand` (Cinzel) for the "Aramis" logo only
+
+**`tailwind.config.ts`**:
+- Change `serif: ["Instrument Serif", "serif"]` to `serif: ["Instrument Sans", "sans-serif"]` (or create a new `heading` family)
+
+This means all headings, timer displays, stat numbers, and section titles will use the clean sans-serif. The brand name "ARAMIS" keeps Cinzel.
+
+---
+
+## 8. Desktop-First App with Overlay Behavior
+
+Transform from mobile-first to a **desktop productivity companion** that can overlay other apps.
+
+### Layout Changes:
+
+**Remove mobile optimizations**:
+- Remove `touch-target` min-height constraints
+- Remove `pb-safe`, `pt-safe` mobile padding
+- Remove responsive breakpoints that prioritize mobile
+- Set base container to desktop-comfortable widths
+
+**Window-like feel**:
+- Add a title bar area with window controls styling (drag area)
+- Compact, information-dense layouts
+- Smaller default font sizes suitable for desktop
+- Hover states instead of touch targets
+
+**Keyboard shortcuts** (new file `src/hooks/useKeyboardShortcuts.ts`):
+- `Ctrl/Cmd + N` -- New note (navigate to `/compose` with new entry)
+- `Ctrl/Cmd + K` -- Open search/command palette
+- `Ctrl/Cmd + J` -- Open AI chat (navigate to `/` and focus input)
+- `Ctrl/Cmd + F` -- Focus mode (navigate to `/focus`)
+- `Ctrl/Cmd + ,` -- Settings
+- `Escape` -- Close sidebars/modals
+- Register via `useEffect` with `keydown` event listener
+
+**Command Palette** (new component `src/components/CommandPalette.tsx`):
+- Uses shadcn `Command` (cmdk, already installed)
+- `Ctrl/Cmd + K` opens it
+- Search entries by title/content
+- Quick actions: New Note, Open AI, Focus Mode, Settings
+- Navigate to results on select
+- Glass overlay with strong blur backdrop
+
+---
+
+## 9. Floating Left Sidebar (Replace Bottom Nav)
+
+Replace the bottom pill nav with a **vertical floating left sidebar**.
+
+**`src/components/layout/SideNav.tsx`** (new file, replaces `BottomNav.tsx`):
+- Fixed left position, centered vertically
+- Narrow pill shape (width ~56px), rounded-2xl
+- Same 7 nav items, displayed vertically as icon buttons
+- Active item highlighted with primary background
+- Tooltip on hover (right side) showing label
+- Glass/frosted treatment matching the new design language
+- GSAP entrance animation (slide in from left)
+- Collapse on smaller viewports to a mini floating button that expands
+
+**`src/App.tsx`**:
+- Replace `<BottomNav />` with `<SideNav />`
+- Adjust page container padding: remove `pb-20` (bottom nav space), add `pl-20` (left nav space)
+
+**`src/components/layout/PageContainer.tsx`**:
+- Change `pb-20` to `pl-20` for left sidebar clearance
+- Remove mobile bottom padding
+
+---
+
+## Files Summary
+
+### New Files
 
 | File | Purpose |
 |------|---------|
-| `supabase/functions/categorize/index.ts` | AI categorization edge function using tool calling |
-| `src/hooks/useCellarAI.ts` | Hook for triggering and consuming AI categorization |
-| `src/assets/auth-bg.jpg` | Uploaded sunset image for auth left panel |
+| `src/components/layout/SideNav.tsx` | Floating vertical left sidebar navigation |
+| `src/hooks/useKeyboardShortcuts.ts` | Global keyboard shortcut handler |
+| `src/components/CommandPalette.tsx` | Cmd+K search/action palette |
+| `src/lib/markdown.ts` | Lightweight markdown-to-HTML renderer |
 
-## Modified Files
+### Modified Files
 
 | File | Changes |
 |------|---------|
-| `supabase/config.toml` | Add `[functions.chat]` and `[functions.categorize]` declarations |
-| `src/pages/CellarPage.tsx` | Topics filter bar, AI categorize button, grouped masonry, pin sorting |
-| `src/components/cellar/ThoughtCard.tsx` | Pin toggle, category badge |
-| `src/hooks/useJournal.ts` | Add `useTogglePin` mutation, update JournalEntry type for `pinned` and `ai_category` |
-| `src/pages/AppSettingsPage.tsx` | Focus timer settings, Account section, Privacy link |
-| `src/components/focus/PomodoroTimer.tsx` | Variable duration props, inline settings picker |
-| `src/pages/OrchardPage.tsx` | Read timer settings, pass to PomodoroTimer |
-| `src/pages/AuthPage.tsx` | Replace gradient with uploaded image background |
+| `src/pages/AuthPage.tsx` | Full-fit image with `<img>` tag |
+| `src/App.tsx` | Splash once-only logic, replace BottomNav with SideNav, register keyboard shortcuts |
+| `src/components/focus/PomodoroTimer.tsx` | End-time based countdown, ambient chime |
+| `src/lib/sounds.ts` | Add 'chime' sound effect |
+| `src/index.css` | Liquid glass classes, sans-serif headings, desktop-first sizing |
+| `tailwind.config.ts` | Update serif font family to sans |
+| `src/components/layout/PageContainer.tsx` | Left padding instead of bottom |
+| `src/components/cellar/ThoughtCard.tsx` | Render markdown preview |
+| `src/components/cellar/CellarAISidebar.tsx` | Glass treatment |
+| `src/pages/WritePage.tsx` | Markdown preview in summary, glass styling |
+| `src/pages/HomePage.tsx` | Glass treatment, keyboard shortcut integration |
+| `src/components/chat/ChatInput.tsx` | Glass styling |
+
+### Edge Function Deployment
+- Deploy `chat` and `categorize` functions to fix AI
+
+### No Database Changes Required
+
+---
 
 ## Implementation Order
 
-1. Database migration (pinned, ai_category columns)
-2. Fix `supabase/config.toml` and deploy edge functions
-3. Copy auth image asset
-4. Auth page image update
-5. Cellar AI categorization (new edge function + hook + UI)
-6. Cellar pin functionality
-7. Variable timer in Focus
-8. Settings module expansion
-9. End-to-end testing of AI features
+1. Deploy edge functions (chat + categorize) -- fixes AI immediately
+2. Splash screen once-only (localStorage)
+3. Font swap (serif → Instrument Sans)
+4. Liquid glass CSS system
+5. Replace BottomNav with floating left SideNav
+6. Desktop-first layout adjustments + PageContainer
+7. Auth image full-fit
+8. Markdown renderer + display updates
+9. Timer background mode + ambient chime
+10. Keyboard shortcuts + Command Palette
+11. GSAP micro-interactions polish
 

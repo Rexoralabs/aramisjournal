@@ -1,13 +1,15 @@
-import { useState, useCallback, useRef, useLayoutEffect, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { BottomNav } from "@/components/layout/BottomNav";
+import { SideNav } from "@/components/layout/SideNav";
 import { SplashScreen } from "@/components/layout/SplashScreen";
 import { OfflineBanner } from "@/components/layout/OfflineBanner";
+import { CommandPalette } from "@/components/CommandPalette";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import HomePage from "./pages/HomePage";
 import WritePage from "./pages/WritePage";
 import CalendarPage from "./pages/CalendarPage";
@@ -36,40 +38,56 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AppShell() {
+  const [commandOpen, setCommandOpen] = useState(false);
+  useKeyboardShortcuts({ onCommandPalette: () => setCommandOpen(true) });
+
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/compose" element={<WritePage />} />
+        <Route path="/calendar" element={<CalendarPage />} />
+        <Route path="/focus" element={<FocusPage />} />
+        <Route path="/insights" element={<InsightsPage />} />
+        <Route path="/cellar" element={<CellarPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/privacy" element={<PrivacySecurityPage />} />
+        <Route path="/settings" element={<AppSettingsPage />} />
+        <Route path="/write" element={<Navigate to="/compose" replace />} />
+        <Route path="/orchard" element={<Navigate to="/focus" replace />} />
+        <Route path="/history" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+      <SideNav />
+      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
+    </>
+  );
+}
+
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
       <Route path="/*" element={
         <ProtectedRoute>
-          <>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/compose" element={<WritePage />} />
-              <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/focus" element={<FocusPage />} />
-              <Route path="/insights" element={<InsightsPage />} />
-              <Route path="/cellar" element={<CellarPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/privacy" element={<PrivacySecurityPage />} />
-              <Route path="/settings" element={<AppSettingsPage />} />
-              <Route path="/write" element={<Navigate to="/compose" replace />} />
-              <Route path="/orchard" element={<Navigate to="/focus" replace />} />
-              <Route path="/history" element={<Navigate to="/" replace />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <BottomNav />
-          </>
+          <AppShell />
         </ProtectedRoute>
       } />
     </Routes>
   );
 }
 
+const SPLASH_KEY = "aramis-splash-seen";
+
 const App = () => {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => !localStorage.getItem(SPLASH_KEY));
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
-  const handleSplashComplete = useCallback(() => setShowSplash(false), []);
+
+  const handleSplashComplete = useCallback(() => {
+    setShowSplash(false);
+    localStorage.setItem(SPLASH_KEY, "true");
+  }, []);
 
   useEffect(() => {
     const goOffline = () => setIsOffline(true);

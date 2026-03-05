@@ -57,7 +57,6 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        // Custom luxury tokens
         gold: "hsl(var(--gold))",
         "gold-muted": "hsl(var(--gold-muted))",
         cream: "hsl(var(--cream))",
@@ -65,14 +64,13 @@ export default {
         crimson: "hsl(var(--crimson))",
         "crimson-deep": "hsl(var(--crimson-deep))",
         "warm-gray": "hsl(var(--warm-gray))",
-        // Dark mode graphite tokens
         graphite: "hsl(var(--graphite, 200 5% 7%))",
         "graphite-mid": "hsl(var(--graphite-mid, 200 4% 14%))",
         "graphite-light": "hsl(var(--graphite-light, 200 4% 20%))",
       },
       fontFamily: {
         brand: ["Cinzel", "serif"],
-        serif: ["Instrument Serif", "serif"],
+        serif: ["Instrument Sans", "sans-serif"],
         sans: ["Instrument Sans", "sans-serif"],
         emphasis: ["Cormorant Garamond", "serif"],
         ui: ["Bricolage Grotesque", "sans-serif"],

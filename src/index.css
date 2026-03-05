@@ -1,15 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Instrument+Serif&family=Cormorant+Garamond:ital,wght@1,300&family=Bricolage+Grotesque:wght@400;500;600&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Cormorant+Garamond:ital,wght@1,300&family=Bricolage+Grotesque:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Aramis Design System - Premium Minimalist Luxury */
+/* Aramis Design System - Desktop-First Liquid Glass */
 
 @layer base {
   :root {
-    /* Light Mode - Clean near-white */
     --background: 40 20% 97%;
     --foreground: 0 43% 21%;
 
@@ -50,11 +48,10 @@
     --warm-gray: 30 8% 45%;
 
     /* Glassmorphism - Light */
-    --glass-bg: 40 15% 99% / 0.8;
-    --glass-border: 0 43% 21% / 0.06;
+    --glass-bg: 40 15% 99% / 0.7;
+    --glass-border: 0 0% 100% / 0.3;
     --glass-glow: 43 45% 60% / 0.08;
 
-    /* Shadows - Light */
     --shadow-gold: 0 4px 30px hsl(43, 45%, 60%, 0.15);
     --shadow-soft: 0 8px 32px hsl(0, 0%, 0%, 0.06);
     --shadow-card: 0 2px 12px hsl(0, 0%, 0%, 0.04);
@@ -70,7 +67,6 @@
   }
 
   .dark {
-    /* Dark Mode - Neutral dark graphite */
     --background: 200 5% 7%;
     --foreground: 45 20% 92%;
 
@@ -99,7 +95,6 @@
     --input: 200 4% 14%;
     --ring: 43 55% 52%;
 
-    /* Custom luxury tokens - Dark Graphite */
     --gold: 43 55% 52%;
     --gold-muted: 43 40% 42%;
     --cream: 45 20% 92%;
@@ -109,12 +104,11 @@
     --graphite-light: 200 4% 20%;
     --warm-gray: 200 3% 50%;
 
-    /* Glassmorphism - Dark Graphite */
-    --glass-bg: 200 4% 11% / 0.85;
-    --glass-border: 45 20% 92% / 0.06;
+    /* Glassmorphism - Dark */
+    --glass-bg: 200 4% 11% / 0.6;
+    --glass-border: 0 0% 100% / 0.06;
     --glass-glow: 43 55% 52% / 0.12;
 
-    /* Shadows - Dark */
     --shadow-gold: 0 4px 30px hsl(43, 55%, 52%, 0.2);
     --shadow-soft: 0 8px 32px hsl(200, 5%, 0%, 0.5);
     --shadow-card: 0 4px 16px hsl(200, 5%, 0%, 0.4);
@@ -143,16 +137,17 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Instrument Sans', sans-serif;
+    font-size: 14px;
     min-height: 100vh;
   }
 
-  /* Typography hierarchy */
+  /* Typography — all headings use Instrument Sans */
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Instrument Serif', serif;
-    @apply font-normal tracking-tight;
+    font-family: 'Instrument Sans', sans-serif;
+    @apply font-semibold tracking-tight;
   }
 
-  /* Brand typography */
+  /* Brand typography — Aramis logo only */
   .font-brand {
     font-family: 'Cinzel', serif;
   }
@@ -171,18 +166,37 @@
 }
 
 @layer components {
-  /* Glass card component - squircle */
+  /* ═══ Liquid Glass System ═══ */
   .glass-card {
-    @apply rounded-2xl border backdrop-blur-xl;
+    @apply rounded-2xl border;
+    backdrop-filter: blur(40px) saturate(1.8);
+    -webkit-backdrop-filter: blur(40px) saturate(1.8);
     background: hsl(var(--glass-bg));
     border-color: hsl(var(--glass-border));
-    box-shadow: var(--shadow-card);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 
+      var(--shadow-card),
+      inset 0 1px 0 0 hsl(0 0% 100% / 0.06),
+      inset 0 -1px 0 0 hsl(0 0% 0% / 0.04);
+    transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .glass-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-soft);
+    transform: translateY(-2px) scale(1.005);
+    box-shadow: 
+      var(--shadow-soft),
+      inset 0 1px 0 0 hsl(0 0% 100% / 0.1),
+      0 0 0 1px hsl(var(--glass-border));
+  }
+
+  .glass-liquid {
+    backdrop-filter: blur(40px) saturate(1.8);
+    -webkit-backdrop-filter: blur(40px) saturate(1.8);
+    background: hsl(var(--glass-bg));
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: 
+      0 8px 32px hsl(0 0% 0% / 0.12),
+      inset 0 1px 0 hsl(0 0% 100% / 0.06),
+      inset 0 -1px 0 hsl(0 0% 0% / 0.04);
   }
 
   .glass-card-glow {
@@ -198,17 +212,14 @@
     background-clip: text;
   }
 
-  /* Gold border accent */
   .gold-border {
     border: 1px solid hsl(var(--gold) / 0.3);
   }
 
-  /* Gold glow effect */
   .gold-glow {
     box-shadow: var(--shadow-gold);
   }
 
-  /* Text utilities */
   .text-gold {
     color: hsl(var(--gold));
   }
@@ -217,7 +228,6 @@
     color: hsl(var(--cream));
   }
 
-  /* Background utilities */
   .bg-cream {
     background-color: hsl(var(--cream));
   }
@@ -257,7 +267,6 @@
     transform: translateY(-1px) scale(1.02);
   }
 
-  /* Ghost button */
   .btn-ghost {
     @apply rounded-2xl px-4 py-2 font-ui text-sm font-medium transition-all duration-200;
     color: hsl(var(--foreground));
@@ -281,12 +290,10 @@
   }
 
   .chat-bubble-assistant {
-    @apply chat-bubble mr-auto;
-    background: hsl(var(--card));
-    border: 1px solid hsl(var(--border));
+    @apply chat-bubble mr-auto glass-liquid;
   }
 
-  /* Orchard milestone card */
+  /* Milestone card */
   .milestone-card {
     @apply relative rounded-2xl p-6 text-center transition-all duration-500;
     background: hsl(var(--card));
@@ -302,9 +309,9 @@
     opacity: 0.5;
   }
 
-  /* Masonry grid */
+  /* Masonry grid — desktop-first 4-col */
   .masonry-grid {
-    column-count: 2;
+    column-count: 4;
     column-gap: 1rem;
   }
 
@@ -313,43 +320,59 @@
     margin-bottom: 1rem;
   }
 
-  @media (min-width: 768px) {
+  @media (max-width: 1024px) {
     .masonry-grid {
       column-count: 3;
     }
   }
 
-  @media (min-width: 1024px) {
+  @media (max-width: 768px) {
     .masonry-grid {
-      column-count: 4;
+      column-count: 2;
     }
   }
 
   /* Thought card */
   .thought-card {
-    @apply rounded-2xl p-4 border transition-all duration-300 cursor-pointer;
-    background: hsl(var(--card));
-    border-color: hsl(var(--border));
+    @apply rounded-2xl p-4 border transition-all duration-300 cursor-pointer glass-liquid;
   }
 
   .thought-card:hover {
-    transform: translateY(-3px);
+    transform: translateY(-3px) scale(1.01);
     box-shadow: var(--shadow-soft);
     border-color: hsl(var(--gold) / 0.3);
+  }
+
+  /* Markdown rendered content */
+  .markdown-content strong {
+    @apply font-semibold text-foreground;
+  }
+  .markdown-content em {
+    @apply italic;
+  }
+  .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+    @apply font-semibold text-foreground mt-2 mb-1;
+  }
+  .markdown-content h1 { @apply text-lg; }
+  .markdown-content h2 { @apply text-base; }
+  .markdown-content h3 { @apply text-sm; }
+  .markdown-content ul {
+    @apply list-disc list-inside space-y-0.5;
+  }
+  .markdown-content blockquote {
+    @apply border-l-2 border-primary/30 pl-3 italic text-muted-foreground;
   }
 }
 
 @layer utilities {
-  /* Font family utilities */
   .font-serif {
-    font-family: 'Instrument Serif', serif;
+    font-family: 'Instrument Sans', sans-serif;
   }
 
   .font-sans {
     font-family: 'Instrument Sans', sans-serif;
   }
 
-  /* Safe area insets for notched phones */
   .pt-safe {
     padding-top: env(safe-area-inset-top, 0);
   }
@@ -366,13 +389,6 @@
     padding-right: env(safe-area-inset-right, 0);
   }
 
-  /* Touch-friendly sizing */
-  .touch-target {
-    min-height: 44px;
-    min-width: 44px;
-  }
-
-  /* Scroll hide utility */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -380,12 +396,5 @@
 
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
-  }
-
-  /* Mobile text scaling */
-  @media (max-width: 380px) {
-    .text-responsive {
-      font-size: 0.9em;
-    }
   }
 }

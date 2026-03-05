@@ -4,6 +4,7 @@ import { Icon } from "@iconify/react";
 import { useTogglePin } from "@/hooks/useJournal";
 import { haptic } from "@/lib/haptics";
 import { Badge } from "@/components/ui/badge";
+import { renderMarkdown } from "@/lib/markdown";
 import type { JournalEntry } from "@/hooks/useJournal";
 
 const moodEmoji: Record<string, string> = {
@@ -33,7 +34,7 @@ export function ThoughtCard({ entry }: ThoughtCardProps) {
 
   return (
     <div
-      className="thought-card group relative cursor-pointer hover:scale-[1.02] transition-transform"
+      className="thought-card group relative"
       onClick={() => navigate(`/compose?entry=${entry.id}`)}
     >
       {/* Pin button */}
@@ -49,13 +50,14 @@ export function ThoughtCard({ entry }: ThoughtCardProps) {
       </button>
 
       {entry.title && (
-        <h3 className="text-sm font-serif text-foreground mb-1.5 line-clamp-2 pr-6">
+        <h3 className="text-sm font-sans font-medium text-foreground mb-1.5 line-clamp-2 pr-6">
           {entry.title}
         </h3>
       )}
-      <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
-        {preview}
-      </p>
+      <div
+        className="text-xs text-muted-foreground leading-relaxed markdown-content"
+        dangerouslySetInnerHTML={{ __html: renderMarkdown(preview) }}
+      />
       <div className="flex items-center justify-between mt-3">
         <span className="text-[10px] text-muted-foreground font-ui">
           {format(new Date(entry.entry_date), "MMM d")}

@@ -3,6 +3,7 @@ import { Icon } from "@iconify/react";
 import gsap from "gsap";
 import { haptic } from "@/lib/haptics";
 import { showNotification } from "@/lib/notifications";
+import { soundManager } from "@/lib/sounds";
 
 const STORAGE_KEY = "aramis-timer-settings";
 
@@ -34,6 +35,7 @@ export function PomodoroTimer({ onSessionComplete }: { onSessionComplete?: () =>
   const [sessions, setSessions] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const circleRef = useRef<SVGCircleElement>(null);
+  const endTimeRef = useRef<number>(0);
 
   const radius = 110;
   const circumference = 2 * Math.PI * radius;
@@ -51,32 +53,59 @@ export function PomodoroTimer({ onSessionComplete }: { onSessionComplete?: () =>
     }
   }, []);
 
+  const handleTimerComplete = useCallback((currentState: TimerState) => {
+    stopInterval();
+    soundManager.play("chime");
+    if (currentState === "running") {
+      haptic("success");
+      showNotification("Aramis", "Pomodoro complete! Take a break.");
+      setSessions((s) => s + 1);
+      onSessionComplete?.();
+      setState("break");
+      const breakSecs = breakMinutes * 60;
+      setTimeLeft(breakSecs);
+      endTimeRef.current = Date.now() + breakSecs * 1000;
+    } else {
+      haptic("medium");
+      showNotification("Aramis", "Break's over! Ready for another round?");
+      setState("idle");
+      setTimeLeft(workMinutes * 60);
+      endTimeRef.current = 0;
+    }
+  }, [stopInterval, onSessionComplete, workMinutes, breakMinutes]);
+
+  // End-time based countdown — survives tab backgrounding
   useEffect(() => {
     if (state === "running" || state === "break") {
+      if (!endTimeRef.current) {
+        endTimeRef.current = Date.now() + timeLeft * 1000;
+      }
+
       intervalRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            stopInterval();
-            if (state === "running") {
-              haptic("success");
-              showNotification("Aramis", "Pomodoro complete! Take a break.");
-              setSessions((s) => s + 1);
-              onSessionComplete?.();
-              setState("break");
-              return breakMinutes * 60;
-            } else {
-              haptic("medium");
-              showNotification("Aramis", "Break's over! Ready for another round?");
-              setState("idle");
-              return workMinutes * 60;
-            }
-          }
-          return prev - 1;
-        });
-      }, 1000);
+        const remaining = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000));
+        setTimeLeft(remaining);
+        if (remaining <= 0) {
+          handleTimerComplete(state);
+        }
+      }, 250); // 250ms for smoother recovery from background
+
+      // Recalculate on tab return
+      const handleVisibility = () => {
+        if (!document.hidden && endTimeRef.current) {
+          const remaining = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000));
+          setTimeLeft(remaining);
+          if (remaining <= 0) handleTimerComplete(state);
+        }
+      };
+      document.addEventListener("visibilitychange", handleVisibility);
+
+      return () => {
+        stopInterval();
+        document.removeEventListener("visibilitychange", handleVisibility);
+      };
     }
     return stopInterval;
-  }, [state, stopInterval, onSessionComplete, workMinutes, breakMinutes]);
+  }, [state, handleTimerComplete, stopInterval]);
 
   useEffect(() => {
     if (circleRef.current) {
@@ -86,9 +115,15 @@ export function PomodoroTimer({ onSessionComplete }: { onSessionComplete?: () =>
 
   const handleStart = () => {
     haptic("medium");
-    if (state === "idle" || state === "paused") {
+    if (state === "idle") {
+      endTimeRef.current = Date.now() + timeLeft * 1000;
+      setState("running");
+    } else if (state === "paused") {
+      endTimeRef.current = Date.now() + timeLeft * 1000;
       setState("running");
     } else if (state === "running" || state === "break") {
+      stopInterval();
+      endTimeRef.current = 0;
       setState("paused");
     }
   };
@@ -96,6 +131,7 @@ export function PomodoroTimer({ onSessionComplete }: { onSessionComplete?: () =>
   const handleReset = () => {
     haptic("light");
     stopInterval();
+    endTimeRef.current = 0;
     setState("idle");
     setTimeLeft(workMinutes * 60);
   };
@@ -130,7 +166,7 @@ export function PomodoroTimer({ onSessionComplete }: { onSessionComplete?: () =>
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-5xl font-serif text-foreground tabular-nums">
+          <span className="text-5xl font-sans font-semibold text-foreground tabular-nums">
             {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
           </span>
           <span className="text-xs font-ui text-muted-foreground mt-2 uppercase tracking-wider">
@@ -155,7 +191,6 @@ export function PomodoroTimer({ onSessionComplete }: { onSessionComplete?: () =>
         </button>
       </div>
 
-      {/* Inline Settings */}
       {showSettings && (
         <div className="w-full max-w-xs space-y-4 glass-card p-4">
           <div>

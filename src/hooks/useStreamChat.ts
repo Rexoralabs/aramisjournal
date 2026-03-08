@@ -1,9 +1,11 @@
 import { useCallback, useRef } from "react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 type Message = { role: "user" | "assistant"; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+const MAX_MESSAGE_LENGTH = 10000;
 
 interface StreamChatOptions {
   messages: Message[];
@@ -25,15 +27,35 @@ export function useStreamChat() {
     abortControllerRef.current = new AbortController();
 
     try {
+      // Get the user's session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast.error("Please sign in to use AI features.");
+        throw new Error("Not authenticated");
+      }
+
+      // Validate messages client-side
+      for (const msg of messages) {
+        if (msg.content.length > MAX_MESSAGE_LENGTH) {
+          toast.error("Message is too long.");
+          throw new Error("Message too long");
+        }
+      }
+
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ messages, ...(context ? { context } : {}) }),
         signal: abortControllerRef.current.signal,
       });
+
+      if (resp.status === 401) {
+        toast.error("Session expired. Please sign in again.");
+        throw new Error("Unauthorized");
+      }
 
       if (resp.status === 429) {
         toast.error("Rate limit exceeded. Please wait a moment before trying again.");

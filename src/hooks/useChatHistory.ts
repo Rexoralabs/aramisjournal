@@ -97,6 +97,10 @@ export function useAddMessage() {
       role: "user" | "assistant";
       content: string;
     }) => {
+      // Validate message content
+      if (!content.trim()) throw new Error("Message cannot be empty");
+      if (content.length > 10000) throw new Error("Message exceeds maximum length");
+
       const { data, error } = await supabase
         .from("chat_messages")
         .insert({

@@ -1,4 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useLayoutEffect, useEffect } from "react";
+import gsap from "gsap";
+import { setNavHidden } from "@/hooks/useUiChrome";
+import { motion } from "@/hooks/useStyleMode";
 import { format, isToday, isYesterday, isThisWeek, parseISO } from "date-fns";
 import { Icon } from "@iconify/react";
 import { cn } from "@/lib/utils";
@@ -77,11 +80,29 @@ export function ChatSidebar({
     onClose();
   };
 
+  useLayoutEffect(() => {
+    setNavHidden(isOpen);
+    const panel = panelRef.current, overlay = overlayRef.current;
+    if (!panel || !overlay) return;
+    const m = motion();
+    if (isOpen) {
+      gsap.set([panel, overlay], { display: "block" });
+      gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" });
+      gsap.fromTo(panel, { opacity: 0, x: -24, filter: "blur(12px)" }, { opacity: 1, x: 0, filter: "blur(0px)", duration: m.dur, ease: m.ease });
+      gsap.fromTo(panel.querySelectorAll("[data-stagger]"), { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4, stagger: 0.04, delay: 0.1, ease: "power2.out" });
+    } else {
+      gsap.to(overlay, { opacity: 0, duration: 0.3, onComplete: () => gsap.set(overlay, { display: "none" }) });
+      gsap.to(panel, { opacity: 0, x: -24, filter: "blur(12px)", duration: 0.35, ease: "power2.in", onComplete: () => gsap.set(panel, { display: "none" }) });
+    }
+  }, [isOpen]);
+
+  useEffect(() => () => setNavHidden(false), []);
+
   return (
     <>
-      {isOpen && <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden" onClick={onClose} />}
+      <div ref={overlayRef} style={{ display: "none" }} className="fixed inset-0 bg-background/40 backdrop-blur-md z-40" onClick={onClose} />
 
-      <aside className={cn("fixed left-0 top-0 h-full w-72 bg-card border-r border-border z-50 transition-transform duration-300", isOpen ? "translate-x-0" : "-translate-x-full")}>
+      <aside ref={panelRef} style={{ display: "none" }} className="fixed left-3 top-3 bottom-3 w-80 rounded-3xl glass-liquid grain-gradient overflow-hidden z-50">
         <div className="flex flex-col h-full p-4">
           <div className="flex items-center justify-between mb-4">
             <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors touch-target">

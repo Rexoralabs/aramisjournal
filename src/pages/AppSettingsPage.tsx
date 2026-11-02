@@ -297,6 +297,23 @@ const AppSettingsPage = () => {
         {/* Appearance Section */}
         <div className="space-y-1">
           <h2 className="text-xs font-ui text-muted-foreground uppercase tracking-wider px-1">Appearance</h2>
+          <div className="glass-card p-5 mb-3">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:text-aa-duotone" className="h-5 w-5 text-muted-foreground" /></div>
+              <div><p className="font-ui text-foreground">Style</p><p className="text-xs text-muted-foreground">Modern adds richer motion and soft grainy gradients. Editorial mixes serif headlines with sans text.</p></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {(["modern", "editorial"] as const).map((m) => (
+                <button key={m} onClick={() => { setStyleMode(m); haptic("light"); }}
+                  className={`p-4 rounded-2xl border text-left transition-all hover:scale-[1.02] ${styleMode === m ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50"}`}>
+                  <p className={m === "editorial" ? "text-xl text-foreground" : "text-lg font-semibold text-foreground"} style={m === "editorial" ? { fontFamily: "'Instrument Serif', serif" } : undefined}>
+                    {m === "modern" ? "Modern" : "Editorial"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">{m === "modern" ? "Minimal, fluid, premium" : "Serif and sans, calm"}</p>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="glass-card p-5">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 rounded-lg bg-muted"><Icon icon="ph:palette-duotone" className="h-5 w-5 text-muted-foreground" /></div>

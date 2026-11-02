@@ -5,6 +5,7 @@ import gsap from "gsap";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { useNavHidden } from "@/hooks/useUiChrome";
 
 const navItems = [
   { path: "/", icon: "ph:house-duotone", label: "Home" },
@@ -19,6 +20,8 @@ const navItems = [
 export function SideNav() {
   const location = useLocation();
   const pillRef = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const hidden = useNavHidden();
 
   useLayoutEffect(() => {
     if (pillRef.current) {
@@ -30,8 +33,19 @@ export function SideNav() {
     }
   }, []);
 
+  useLayoutEffect(() => {
+    if (!navRef.current) return;
+    gsap.to(navRef.current, {
+      opacity: hidden ? 0 : 1,
+      filter: hidden ? "blur(8px)" : "blur(0px)",
+      x: hidden ? -12 : 0,
+      duration: 0.4,
+      ease: "power3.out",
+    });
+  }, [hidden]);
+
   return (
-    <nav className="fixed left-4 top-1/2 -translate-y-1/2 z-50">
+    <nav ref={navRef} className={cn("fixed left-4 top-1/2 -translate-y-1/2 z-50", hidden && "pointer-events-none")}>
       <div
         ref={pillRef}
         className="flex flex-col items-center gap-1 px-2 py-3 rounded-2xl glass-liquid"

@@ -57,6 +57,8 @@ export function ChatSidebar({
   const [searchQuery, setSearchQuery] = useState("");
   const [convosOpen, setConvosOpen] = useState(true);
   const deleteConversation = useDeleteConversation();
+  const panelRef = useRef<HTMLElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations;
@@ -104,7 +106,7 @@ export function ChatSidebar({
 
       <aside ref={panelRef} style={{ display: "none" }} className="fixed left-3 top-3 bottom-3 w-80 rounded-3xl glass-liquid grain-gradient overflow-hidden z-50">
         <div className="flex flex-col h-full p-4">
-          <div className="flex items-center justify-between mb-4">
+          <div data-stagger className="flex items-center justify-between mb-4">
             <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors touch-target">
               <Icon icon="ph:caret-left" className="h-5 w-5 text-muted-foreground" />
             </button>
@@ -113,7 +115,7 @@ export function ChatSidebar({
             </button>
           </div>
 
-          <div className="relative mb-4">
+          <div data-stagger className="relative mb-4">
             <Icon icon="ph:magnifying-glass" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
@@ -124,7 +126,7 @@ export function ChatSidebar({
             />
           </div>
 
-          <button onClick={handleNewChat} className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/15 transition-colors mb-4 touch-target">
+          <button data-stagger onClick={handleNewChat} className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/15 transition-colors mb-4 touch-target">
             <Icon icon="ph:file-plus-duotone" className="h-5 w-5 text-primary" />
             <span className="font-ui text-sm text-foreground">New Chat</span>
           </button>

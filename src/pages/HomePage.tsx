@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { Icon } from "@iconify/react";
 import { getDayOfYear } from "date-fns";
-import { PageContainer } from "@/components/layout/PageContainer";
+import gsap from "gsap";
+import { useQueryClient } from "@tanstack/react-query";
 import { GreetingHeader } from "@/components/chat/GreetingHeader";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { useUserProfile } from "@/hooks/useProfile";
-import { useUserStreak } from "@/hooks/useStreaks";
 import { useTheme } from "@/hooks/useTheme";
 import { useStreamChat } from "@/hooks/useStreamChat";
 import { useJournalEntries } from "@/hooks/useJournal";
@@ -24,15 +24,19 @@ function buildJournalContext(entries: any[]): string {
   ).join("\n");
 }
 
+type LocalMsg = { id: string; role: "user" | "assistant"; content: string };
+
 const HomePage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [pending, setPending] = useState<LocalMsg[]>([]);
   const [streamingContent, setStreamingContent] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const qc = useQueryClient();
 
   const { data: profile } = useUserProfile();
-  const { data: streakData } = useUserStreak();
   const { theme, setTheme } = useTheme();
   const { streamChat } = useStreamChat();
   const { data: conversations = [] } = useChatConversations();
@@ -45,115 +49,125 @@ const HomePage = () => {
   const displayName = profile?.display_name || "Writer";
   const dayOfYear = getDayOfYear(new Date());
 
+  // Merge saved + pending without duplicates
+  const savedIds = new Set(messages.map(m => m.content + m.role));
+  const visiblePending = pending.filter(p => !savedIds.has(p.content + p.role));
+  const allMessages: LocalMsg[] = [...messages as LocalMsg[], ...visiblePending];
+  const showGreeting = allMessages.length === 0 && !isTyping;
+
+  useLayoutEffect(() => {
+    if (!pageRef.current) return;
+    gsap.fromTo(pageRef.current, { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.6, ease: "expo.out" });
+  }, []);
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent]);
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: streamingContent ? "auto" : "smooth" });
+  }, [allMessages.length, streamingContent]);
 
   const handleNewConversation = () => {
     setCurrentConversationId(null);
+    setPending([]);
     setSidebarOpen(false);
   };
 
   const handleSendMessage = async (content: string) => {
-    let conversationId = currentConversationId;
     haptic('medium');
     soundManager.play('send');
-
-    if (!conversationId) {
-      const newConv = await createConversation.mutateAsync(undefined);
-      conversationId = newConv.id;
-      setCurrentConversationId(conversationId);
-    }
-
-    await addMessage.mutateAsync({ conversationId, role: "user", content });
-
-    const currentConv = conversations.find(c => c.id === conversationId);
-    if (!currentConv?.title && content.length > 0) {
-      const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
-      await updateTitle.mutateAsync({ id: conversationId, title });
-    }
-
+    const history = allMessages.map(m => ({ role: m.role, content: m.content }));
+    setPending(p => [...p, { id: `local-${Date.now()}`, role: "user", content }]);
     setIsTyping(true);
     setStreamingContent("");
 
-    const chatMessages = [...messages, { role: "user" as const, content }].map(m => ({
-      role: m.role as "user" | "assistant", content: m.content,
-    }));
+    let conversationId = currentConversationId;
+    try {
+      if (!conversationId) {
+        const newConv = await createConversation.mutateAsync(undefined);
+        conversationId = newConv.id;
+        setCurrentConversationId(conversationId);
+        updateTitle.mutate({ id: conversationId, title: content.slice(0, 50) + (content.length > 50 ? "..." : "") });
+      }
+      addMessage.mutate({ conversationId, role: "user", content });
+    } catch {
+      setIsTyping(false);
+      return;
+    }
 
-    const context = buildJournalContext(journalEntries);
     let fullResponse = "";
-
+    const convId = conversationId;
     await streamChat({
-      messages: chatMessages,
-      context: context || undefined,
+      messages: [...history, { role: "user" as const, content }],
+      context: buildJournalContext(journalEntries) || undefined,
       onDelta: (chunk) => { fullResponse += chunk; setStreamingContent(fullResponse); },
       onDone: async () => {
-        setIsTyping(false);
-        setStreamingContent("");
         haptic('success');
         soundManager.play('receive');
-        if (fullResponse && conversationId) {
-          await addMessage.mutateAsync({ conversationId, role: "assistant", content: fullResponse });
+        if (fullResponse) {
+          setPending(p => [...p, { id: `local-a-${Date.now()}`, role: "assistant", content: fullResponse }]);
+        }
+        setStreamingContent("");
+        setIsTyping(false);
+        if (fullResponse && convId) {
+          await addMessage.mutateAsync({ conversationId: convId, role: "assistant", content: fullResponse });
+          qc.invalidateQueries({ queryKey: ["chat-messages", convId] });
         }
       },
       onError: () => { setIsTyping(false); setStreamingContent(""); },
     });
   };
 
-  const showGreeting = !currentConversationId || messages.length === 0;
+  const selectConversation = (id: string) => { setPending([]); setCurrentConversationId(id); };
 
   return (
     <>
       <ChatSidebar conversations={conversations} currentConversationId={currentConversationId}
-        onSelectConversation={setCurrentConversationId} onNewConversation={handleNewConversation}
+        onSelectConversation={selectConversation} onNewConversation={handleNewConversation}
         isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <PageContainer className="flex flex-col h-[calc(100vh-80px)]">
-        <div className="flex items-center justify-between py-3">
-          <button onClick={() => { haptic('selection'); soundManager.play('swoosh'); setSidebarOpen(true); }}
-            className="p-2 rounded-lg hover:bg-muted transition-colors touch-target">
+      <main ref={pageRef} className="h-screen flex flex-col pl-20 pr-4 grain-gradient" style={{ opacity: 0 }}>
+        <header className="flex items-center justify-between py-4 max-w-5xl w-full mx-auto">
+          <button aria-label="Open conversations" onClick={() => { haptic('selection'); soundManager.play('swoosh'); setSidebarOpen(true); }}
+            className="p-2 rounded-xl hover:bg-muted transition-colors">
             <Icon icon="ph:list" className="h-5 w-5 text-muted-foreground" />
           </button>
-          <div className="text-center">
-            <span className="text-base sm:text-lg font-serif text-foreground">
-              {dayOfYear} <span className="italic text-muted-foreground">of</span> 365
-            </span>
-          </div>
-          <button onClick={() => { haptic('selection'); setTheme(theme === "dark" ? "light" : "dark"); }}
-            className="p-2 rounded-lg hover:bg-muted transition-colors touch-target">
-            {theme === "dark" ? <Icon icon="ph:sun-duotone" className="h-5 w-5 text-muted-foreground" /> : <Icon icon="ph:moon-duotone" className="h-5 w-5 text-muted-foreground" />}
+          <span className="text-lg font-serif text-foreground">
+            {dayOfYear} <span className="italic text-muted-foreground">of</span> 365
+          </span>
+          <button aria-label="Toggle theme" onClick={() => { haptic('selection'); setTheme(theme === "dark" ? "light" : "dark"); }}
+            className="p-2 rounded-xl hover:bg-muted transition-colors">
+            <Icon icon={theme === "dark" ? "ph:sun-duotone" : "ph:moon-duotone"} className="h-5 w-5 text-muted-foreground" />
           </button>
-        </div>
+        </header>
 
-        {showGreeting ? (
-          <>
-            <GreetingHeader displayName={displayName} />
-            <div className="pb-8">
-              <ChatInput onSend={handleSendMessage} disabled={isTyping} placeholder="Share your thoughts..." centered />
+        <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-hide">
+          {showGreeting ? (
+            <div className="h-full flex items-center justify-center pb-16">
+              <GreetingHeader displayName={displayName} />
             </div>
-          </>
-        ) : (
-          <>
-            <div className="flex-1 overflow-y-auto py-4 space-y-4 scrollbar-hide">
-              {messages.map((msg, idx) => (
-                <ChatMessage key={msg.id} message={msg} isLatest={idx === messages.length - 1 && !streamingContent} />
+          ) : (
+            <div className="max-w-3xl mx-auto w-full py-6 space-y-6">
+              {allMessages.map((msg) => (
+                <ChatMessage key={msg.id} message={msg} animate={msg.id.startsWith("local-") && msg.role === "user"} />
               ))}
               {streamingContent && (
-                <div className="flex justify-start"><div className="chat-bubble-assistant"><p className="text-sm leading-relaxed whitespace-pre-wrap">{streamingContent}</p></div></div>
+                <ChatMessage message={{ id: "stream", role: "assistant", content: streamingContent }} streaming />
               )}
               {isTyping && !streamingContent && (
-                <div className="flex justify-start"><div className="chat-bubble-assistant"><div className="flex gap-1">
-                  <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                </div></div></div>
+                <div className="flex gap-1.5 py-2">
+                  {[0, 150, 300].map(d => (
+                    <span key={d} className="h-2 w-2 bg-muted-foreground/50 rounded-full animate-pulse" style={{ animationDelay: `${d}ms` }} />
+                  ))}
+                </div>
               )}
-              <div ref={messagesEndRef} />
             </div>
-            <div className="pb-4"><ChatInput onSend={handleSendMessage} disabled={isTyping} placeholder="Share your thoughts..." /></div>
-          </>
-        )}
-      </PageContainer>
+          )}
+        </div>
+
+        <div className="pb-6 pt-2 max-w-3xl w-full mx-auto">
+          <ChatInput onSend={handleSendMessage} disabled={isTyping} placeholder="Share your thoughts..." />
+          <p className="text-center text-[11px] font-ui text-muted-foreground/70 mt-2">Aramis reflects on your journal to respond. Enter to send, Shift+Enter for a new line.</p>
+        </div>
+      </main>
     </>
   );
 };

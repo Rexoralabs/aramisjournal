@@ -1,0 +1,4 @@
+- [ ] Diagnose and verify app loading.
+- [ ] Load Instrument Serif for Editorial and replace the Auth image.
+- [ ] Package all portable source, configuration, assets and backend files with Tauri handoff notes.
+- [ ] Check security and request publishing.

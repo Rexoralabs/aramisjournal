@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import gsap from "gsap";
 import authPhoto from "@/assets/auth-evening.jpg.asset.json";
 
-const authBg = authPhoto.url;
+const authBg = import.meta.env.DEV ? `https://aramisdaily.lovable.app${authPhoto.url}` : authPhoto.url;
 
 type AuthMode = "login" | "signup";
 

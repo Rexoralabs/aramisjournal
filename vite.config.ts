@@ -39,7 +39,7 @@ export default defineConfig(({ mode }) => ({
         navigateFallbackDenylist: [/^\/~oauth/],
         runtimeCaching: [
           {
-            urlPattern: ({ request, url }) => request.mode === "navigate" && url.origin === self.location.origin && !url.pathname.startsWith("/~oauth"),
+            urlPattern: ({ request, url, sameOrigin }) => request.mode === "navigate" && sameOrigin && !url.pathname.startsWith("/~oauth"),
             handler: "NetworkFirst",
             options: {
               cacheName: "aramis-pages",
@@ -48,7 +48,7 @@ export default defineConfig(({ mode }) => ({
             },
           },
           {
-            urlPattern: ({ url }) => url.origin === self.location.origin && /^\/assets\/.*-[\w-]+\.(js|css|woff2|png|jpg|svg)$/.test(url.pathname),
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && /^\/assets\/.*-[\w-]+\.(js|css|woff2|png|jpg|svg)$/.test(url.pathname),
             handler: "CacheFirst",
             options: { cacheName: "aramis-assets", expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 } },
           },

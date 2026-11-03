@@ -1,4 +1,5 @@
 import { useState, useRef, useLayoutEffect, useEffect } from "react";
+import { useStyleMode } from "@/hooks/useStyleMode";
 import { Icon } from "@iconify/react";
 import { useNavigate } from "react-router-dom";
 import gsap from "gsap";

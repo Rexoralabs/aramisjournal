@@ -49,6 +49,7 @@ function getTimerSettings() {
 
 const AppSettingsPage = () => {
   const navigate = useNavigate();
+  const { mode: styleMode, setMode: setStyleMode } = useStyleMode();
   const { user, signOut } = useAuth();
   const { data: profile } = useUserProfile();
   const updateProfile = useUpdateProfile();

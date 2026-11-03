@@ -17,6 +17,8 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
+      injectRegister: null,
+      devOptions: { enabled: false },
       includeAssets: ["favicon.ico", "robots.txt"],
       manifest: {
         name: "Aramis - Mindful Journaling",
@@ -33,18 +35,22 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        navigateFallback: "/index.html",
+        globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
         navigateFallbackDenylist: [/^\/~oauth/],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+            urlPattern: ({ request, url }) => request.mode === "navigate" && url.origin === self.location.origin && !url.pathname.startsWith("/~oauth"),
             handler: "NetworkFirst",
             options: {
-              cacheName: "supabase-api",
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 },
+              cacheName: "aramis-pages",
+              expiration: { maxEntries: 20, maxAgeSeconds: 24 * 60 * 60 },
               networkTimeoutSeconds: 10,
             },
+          },
+          {
+            urlPattern: ({ url }) => url.origin === self.location.origin && /^\/assets\/.*-[\w-]+\.(js|css|woff2|png|jpg|svg)$/.test(url.pathname),
+            handler: "CacheFirst",
+            options: { cacheName: "aramis-assets", expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 } },
           },
         ],
       },

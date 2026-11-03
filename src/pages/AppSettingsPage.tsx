@@ -1,4 +1,5 @@
 import { useState, useRef, useLayoutEffect, useEffect } from "react";
+import { useStyleMode } from "@/hooks/useStyleMode";
 import { Icon } from "@iconify/react";
 import { useNavigate } from "react-router-dom";
 import gsap from "gsap";
@@ -49,6 +50,7 @@ function getTimerSettings() {
 
 const AppSettingsPage = () => {
   const navigate = useNavigate();
+  const { mode: styleMode, setMode: setStyleMode } = useStyleMode();
   const { user, signOut } = useAuth();
   const { data: profile } = useUserProfile();
   const updateProfile = useUpdateProfile();

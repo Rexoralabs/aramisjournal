@@ -4,7 +4,9 @@ import { Icon } from "@iconify/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import gsap from "gsap";
-import authBg from "@/assets/auth-bg.jpg";
+import authPhoto from "@/assets/auth-evening.jpg.asset.json";
+
+const authBg = authPhoto.url;
 
 type AuthMode = "login" | "signup";
 

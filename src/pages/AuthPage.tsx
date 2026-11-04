@@ -50,14 +50,13 @@ const AuthPage = () => {
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
-      {/* Left Panel — Full-fit Image */}
+      {/* Left Panel — Edge-to-edge Image */}
       <div ref={leftRef} className="relative hidden lg:flex flex-col justify-between p-10 overflow-hidden bg-foreground">
-        <img src={authBg} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-70" />
         <img
           src={authBg}
           alt="Aramis — serene landscape"
           decoding="async"
-          className="absolute inset-0 w-full h-full object-contain"
+          className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/40" />
         <h1 className="relative z-10 text-2xl font-brand tracking-widest text-white">Aramis</h1>

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { designMotion } from "@/lib/designMotion";
 
 export type StyleMode = "modern" | "editorial";
 const KEY = "aramis-style";
@@ -30,7 +31,5 @@ export function useStyleMode() {
 
 /** Motion presets per style mode */
 export function motion() {
-  return getStyleMode() === "modern"
-    ? { ease: "expo.out", dur: 0.7, spring: "back.out(1.6)" }
-    : { ease: "power2.out", dur: 0.4, spring: "power2.out" };
+  return designMotion();
 }

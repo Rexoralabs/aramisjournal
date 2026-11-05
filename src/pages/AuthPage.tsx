@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import gsap from "gsap";
 import authPhoto from "@/assets/auth-evening.jpg.asset.json";
+import { Button } from "@/components/ui/button";
 
 const authBg = import.meta.env.DEV ? `https://aramisdaily.lovable.app${authPhoto.url}` : authPhoto.url;
 
@@ -58,13 +59,13 @@ const AuthPage = () => {
           decoding="async"
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/40" />
-        <h1 className="relative z-10 text-2xl font-brand tracking-widest text-white">Aramis</h1>
+        <div className="absolute inset-0 image-overlay" />
+        <h1 className="relative z-10 text-2xl font-brand tracking-widest text-image-foreground">Aramis</h1>
         <div className="relative z-10 max-w-sm">
-          <p className="font-emphasis text-2xl text-white/90 leading-relaxed">
+          <p className="font-emphasis text-2xl text-image-foreground/90 leading-relaxed">
             "Get access to your personal hub for clarity, reflection, and productivity."
           </p>
-          <p className="text-sm font-ui text-white/60 mt-4">Where silence meets reflection</p>
+          <p className="text-sm font-ui text-image-foreground/60 mt-4">Where silence meets reflection</p>
         </div>
       </div>
 
@@ -118,14 +119,13 @@ const AuthPage = () => {
                 <Icon icon="ph:lock-duotone" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••"
                   className="w-full rounded-xl border border-border bg-card py-3 pl-10 pr-10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm" />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                <Button variant="bare" size="inline" type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2">
                   <Icon icon={showPassword ? "ph:eye-slash-duotone" : "ph:eye-duotone"} className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
             </div>
 
-            <button type="submit" disabled={isLoading}
-              className="w-full rounded-full bg-foreground text-background py-3 font-ui text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
+            <Button variant="ink" size="pill" type="submit" disabled={isLoading}>
               {isLoading ? (
                 <span className="h-5 w-5 border-2 border-background/30 border-t-background rounded-full animate-spin" />
               ) : (
@@ -134,7 +134,7 @@ const AuthPage = () => {
                   <Icon icon="ph:arrow-right" className="h-4 w-4" />
                 </>
               )}
-            </button>
+            </Button>
           </form>
 
           <div className="relative">
@@ -143,19 +143,19 @@ const AuthPage = () => {
           </div>
 
           <div className="flex gap-3 justify-center">
-            <button className="h-11 w-11 rounded-xl border border-border flex items-center justify-center hover:bg-muted transition-colors">
+            <Button variant="bare" size="provider" aria-label="Continue with Google" className="hover:bg-muted">
               <Icon icon="ph:google-logo" className="h-5 w-5 text-muted-foreground" />
-            </button>
-            <button className="h-11 w-11 rounded-xl border border-border flex items-center justify-center hover:bg-muted transition-colors">
+            </Button>
+            <Button variant="bare" size="provider" aria-label="Continue with Apple" className="hover:bg-muted">
               <Icon icon="ph:apple-logo" className="h-5 w-5 text-muted-foreground" />
-            </button>
+            </Button>
           </div>
 
           <p className="text-center text-sm font-ui text-muted-foreground">
             {mode === "login" ? "Don't have an account? " : "Already have an account? "}
-            <button onClick={() => setMode(mode === "login" ? "signup" : "login")} className="text-primary font-medium hover:underline">
+            <Button variant="link" size="inline" onClick={() => setMode(mode === "login" ? "signup" : "login")}>
               {mode === "login" ? "Sign up" : "Sign in"}
-            </button>
+            </Button>
           </p>
         </div>
       </div>

@@ -35,6 +35,34 @@
     --ring: 43 45% 60%;
 
     --radius: 0.75rem;
+    --radius-control: 0.625rem;
+    --radius-field: 0.75rem;
+    --radius-card: 1rem;
+    --radius-pill: 9999px;
+    --font-body: 'Instrument Sans', sans-serif;
+    --font-display: 'Instrument Sans', sans-serif;
+    --font-brand: 'Cinzel', serif;
+    --font-ui: 'Bricolage Grotesque', sans-serif;
+    --font-emphasis: 'Cormorant Garamond', serif;
+    --content-reading: 48rem;
+    --content-desktop: 56rem;
+    --content-wide: 64rem;
+    --content-composer: 47.5rem;
+    --glass-blur: 40px;
+    --glass-saturation: 1.8;
+    --surface-highlight: 0 0% 100%;
+    --surface-shade: 0 0% 0%;
+    --image-ink: 0 0% 0%;
+    --image-foreground: 0 0% 100%;
+    --image-overlay: linear-gradient(to top, hsl(var(--image-ink) / 0.7), hsl(var(--image-ink) / 0.2), hsl(var(--image-ink) / 0.4));
+    --motion-fast: 200ms;
+    --motion-surface: 350ms;
+    --motion-exit: 300ms;
+    --motion-enter: 700ms;
+    --motion-ease-enter: expo.out;
+    --motion-ease-spring: back.out(1.6);
+    --ease-surface: cubic-bezier(0.22, 1, 0.36, 1);
+    --shadow-glass: 0 8px 32px hsl(var(--surface-shade) / 0.12), inset 0 1px 0 hsl(var(--surface-highlight) / 0.06), inset 0 -1px 0 hsl(var(--surface-shade) / 0.04);
 
     /* Custom luxury tokens - Light */
     --gold: 43 45% 60%;
@@ -134,22 +162,29 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Instrument Sans', sans-serif;
+    font-family: var(--font-body);
     font-size: 14px;
     min-height: 100vh;
   }
 
   /* Typography — all headings use Instrument Sans */
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Instrument Sans', sans-serif;
-    @apply font-semibold tracking-tight;
+    font-family: var(--font-display);
+    @apply font-semibold;
+    letter-spacing: 0;
   }
 
   /* Editorial style: serif headlines + sans body */
+  html[data-style="editorial"] {
+    --font-display: 'Instrument Serif', serif;
+    --motion-enter: 400ms;
+    --motion-ease-enter: power2.out;
+    --motion-ease-spring: power2.out;
+  }
   html[data-style="editorial"] h1,
   html[data-style="editorial"] h2,
   html[data-style="editorial"] .font-serif {
-    font-family: 'Instrument Serif', serif !important;
+    font-family: var(--font-display) !important;
     font-weight: 400;
     letter-spacing: 0;
   }
@@ -172,19 +207,19 @@
 
   /* Brand typography — Aramis logo only */
   .font-brand {
-    font-family: 'Cinzel', serif;
+    font-family: var(--font-brand);
   }
 
   /* Emphasis/Quotes */
   .font-emphasis {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: var(--font-emphasis);
     font-style: italic;
     font-weight: 300;
   }
 
   /* UI Labels */
   .font-ui {
-    font-family: 'Bricolage Grotesque', sans-serif;
+    font-family: var(--font-ui);
   }
 }
 
@@ -192,34 +227,31 @@
   /* ═══ Liquid Glass System ═══ */
   .glass-card {
     @apply rounded-2xl border;
-    backdrop-filter: blur(40px) saturate(1.8);
-    -webkit-backdrop-filter: blur(40px) saturate(1.8);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
     background: hsl(var(--glass-bg));
     border-color: hsl(var(--glass-border));
     box-shadow: 
       var(--shadow-card),
-      inset 0 1px 0 0 hsl(0 0% 100% / 0.06),
-      inset 0 -1px 0 0 hsl(0 0% 0% / 0.04);
-    transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+      inset 0 1px 0 0 hsl(var(--surface-highlight) / 0.06),
+      inset 0 -1px 0 0 hsl(var(--surface-shade) / 0.04);
+    transition: all var(--motion-surface) var(--ease-surface);
   }
 
   .glass-card:hover {
     transform: translateY(-2px) scale(1.005);
     box-shadow: 
       var(--shadow-soft),
-      inset 0 1px 0 0 hsl(0 0% 100% / 0.1),
+      inset 0 1px 0 0 hsl(var(--surface-highlight) / 0.1),
       0 0 0 1px hsl(var(--glass-border));
   }
 
   .glass-liquid {
-    backdrop-filter: blur(40px) saturate(1.8);
-    -webkit-backdrop-filter: blur(40px) saturate(1.8);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
     background: hsl(var(--glass-bg));
     border: 1px solid hsl(var(--glass-border));
-    box-shadow: 
-      0 8px 32px hsl(0 0% 0% / 0.12),
-      inset 0 1px 0 hsl(0 0% 100% / 0.06),
-      inset 0 -1px 0 hsl(0 0% 0% / 0.04);
+    box-shadow: var(--shadow-glass);
   }
 
   .glass-card-glow {
@@ -388,12 +420,13 @@
 }
 
 @layer utilities {
+  .image-overlay { background: var(--image-overlay); }
   .font-serif {
-    font-family: 'Instrument Sans', sans-serif;
+    font-family: var(--font-display);
   }
 
   .font-sans {
-    font-family: 'Instrument Sans', sans-serif;
+    font-family: var(--font-body);
   }
 
   .pt-safe {
@@ -425,4 +458,12 @@
   content: ""; display: inline-block; width: 0.5em; height: 1em; margin-left: 2px;
   vertical-align: -0.15em; border-radius: 2px; background: hsl(var(--primary) / 0.6);
   animation: pulse 1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

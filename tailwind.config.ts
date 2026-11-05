@@ -17,6 +17,8 @@ export default {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        "image-ink": "hsl(var(--image-ink))",
+        "image-foreground": "hsl(var(--image-foreground))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
@@ -69,16 +71,27 @@ export default {
         "graphite-light": "hsl(var(--graphite-light, 200 4% 20%))",
       },
       fontFamily: {
-        brand: ["Cinzel", "serif"],
-        serif: ["Instrument Sans", "sans-serif"],
-        sans: ["Instrument Sans", "sans-serif"],
-        emphasis: ["Cormorant Garamond", "serif"],
-        ui: ["Bricolage Grotesque", "sans-serif"],
+        brand: ["var(--font-brand)"],
+        serif: ["var(--font-display)"],
+        sans: ["var(--font-body)"],
+        emphasis: ["var(--font-emphasis)"],
+        ui: ["var(--font-ui)"],
       },
       borderRadius: {
+        control: "var(--radius-control)",
+        field: "var(--radius-field)",
+        card: "var(--radius-card)",
+        xl: "var(--radius-field)",
+        "2xl": "var(--radius-card)",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      maxWidth: {
+        reading: "var(--content-reading)",
+        desktop: "var(--content-desktop)",
+        wide: "var(--content-wide)",
+        composer: "var(--content-composer)",
       },
       keyframes: {
         "accordion-down": {

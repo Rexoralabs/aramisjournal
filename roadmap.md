@@ -2,3 +2,6 @@
 - [x] Load Instrument Serif for Editorial and replace the Auth image.
 - [x] Package all portable source, configuration, assets and backend files with Tauri handoff notes.
 - [x] Check security and request publishing.
+- [ ] Formalize existing design tokens and shared control variants without redesigning.
+- [ ] Document typography, layout, surfaces, motion, and change rules.
+- [ ] Add a design-drift check and verify existing appearance.

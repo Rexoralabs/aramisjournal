@@ -467,3 +467,7 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Landing is always Editorial, regardless of the chosen style mode */
+.editorial-scope { --font-display: "Instrument Serif", serif; }
+.editorial-scope .font-serif { font-weight: 400; letter-spacing: -0.01em; }

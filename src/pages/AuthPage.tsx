@@ -1,5 +1,6 @@
 import { useState, useRef, useLayoutEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { handleToAddress, isValidHandle, normalizeHandle } from "@/lib/ultra";
 import { Icon } from "@iconify/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -12,7 +13,9 @@ const authBg = import.meta.env.DEV ? `https://aramisdaily.lovable.app${authPhoto
 type AuthMode = "login" | "signup";
 
 const AuthPage = () => {
-  const [mode, setMode] = useState<AuthMode>("login");
+  const [params] = useSearchParams();
+  const intent = params.get("intent");
+  const [mode, setMode] = useState<AuthMode>(params.get("mode") === "signup" ? "signup" : "login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -33,18 +36,21 @@ const AuthPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) { toast.error("Please fill in all fields"); return; }
+    const handle = normalizeHandle(email);
+    if (!handle || !password) { toast.error("Please fill in all fields"); return; }
+    if (!isValidHandle(handle)) { toast.error("Handles are 3–30 characters: letters, numbers, dots, dashes"); return; }
+    const address = handleToAddress(handle);
     if (mode === "signup" && password.length < 6) { toast.error("Password must be at least 6 characters"); return; }
     setIsLoading(true);
     try {
       if (mode === "login") {
-        const { error } = await signIn(email, password);
+        const { error } = await signIn(address, password);
         if (error) toast.error(error.message);
-        else { toast.success("Welcome back!"); navigate("/"); }
+        else { toast.success("Welcome back!"); navigate(intent === "download" ? "/?intent=download" : "/"); }
       } else {
-        const { error } = await signUp(email, password, displayName || "Writer");
-        if (error) toast.error(error.message);
-        else { toast.success("Account created! Check your email to verify."); }
+        const { error } = await signUp(address, password, displayName || handle);
+        if (error) toast.error(error.message.includes("registered") ? `${address} is already taken` : error.message);
+        else { toast.success(`Welcome, ${address}`); navigate(intent === "download" ? "/?intent=download" : "/"); }
       }
     } finally { setIsLoading(false); }
   };
@@ -85,10 +91,10 @@ const AuthPage = () => {
 
           <div className="text-center">
             <h2 className="text-2xl font-sans font-semibold text-foreground">
-              {mode === "login" ? "Welcome back" : "Create an account"}
+              {mode === "login" ? "Welcome back" : "Create your Ultra Account"}
             </h2>
             <p className="text-sm font-ui text-muted-foreground mt-2">
-              {mode === "login" ? "Sign in to continue your journey" : "Start your mindful journaling practice"}
+              {mode === "login" ? "Sign in with your Ultra Account" : "Claim your name@ultra.co"}
             </p>
           </div>
 
@@ -105,11 +111,12 @@ const AuthPage = () => {
             )}
 
             <div className="space-y-1.5">
-              <label className="text-xs font-ui text-muted-foreground">Email</label>
+              <label className="text-xs font-ui text-muted-foreground">Ultra Account</label>
               <div className="relative">
-                <Icon icon="ph:envelope-duotone" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com"
-                  className="w-full rounded-xl border border-border bg-card py-3 pl-10 pr-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm" />
+                <Icon icon="ph:at-duotone" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input type="text" autoComplete="username" value={email} onChange={(e) => setEmail(normalizeHandle(e.target.value))} placeholder="yourname"
+                  className="w-full rounded-xl border border-border bg-card py-3 pl-10 pr-24 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm" />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-ui text-muted-foreground">@ultra.co</span>
               </div>
             </div>
 
@@ -137,19 +144,9 @@ const AuthPage = () => {
             </Button>
           </form>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-            <div className="relative flex justify-center text-xs"><span className="bg-background px-4 text-muted-foreground font-ui">or continue with</span></div>
-          </div>
-
-          <div className="flex gap-3 justify-center">
-            <Button variant="bare" size="provider" aria-label="Continue with Google" className="hover:bg-muted">
-              <Icon icon="ph:google-logo" className="h-5 w-5 text-muted-foreground" />
-            </Button>
-            <Button variant="bare" size="provider" aria-label="Continue with Apple" className="hover:bg-muted">
-              <Icon icon="ph:apple-logo" className="h-5 w-5 text-muted-foreground" />
-            </Button>
-          </div>
+          <p className="text-center text-xs font-ui text-muted-foreground">
+            Ultra Account by Rexora — one name@ultra.co for every Rexora app.
+          </p>
 
           <p className="text-center text-sm font-ui text-muted-foreground">
             {mode === "login" ? "Don't have an account? " : "Already have an account? "}

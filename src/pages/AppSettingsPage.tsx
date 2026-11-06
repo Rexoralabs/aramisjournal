@@ -1,5 +1,6 @@
 import { useState, useRef, useLayoutEffect, useEffect } from "react";
 import { useStyleMode } from "@/hooks/useStyleMode";
+import { UltraAccountCard } from "@/components/settings/UltraAccountCard";
 import { Icon } from "@iconify/react";
 import { useNavigate } from "react-router-dom";
 import gsap from "gsap";
@@ -295,6 +296,8 @@ const AppSettingsPage = () => {
             </div>
           </div>
         </div>
+
+        <UltraAccountCard />
 
         {/* Appearance Section */}
         <div className="space-y-1">

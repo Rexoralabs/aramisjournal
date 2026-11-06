@@ -26,7 +26,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div ref={root} className="min-h-screen bg-background text-foreground">
+    <div ref={root} className="editorial-scope min-h-screen bg-background text-foreground">
       <header className="mx-auto flex max-w-wide items-center justify-between px-6 py-6">
         <span className="font-brand text-xl tracking-widest">Aramis</span>
         <nav className="flex items-center gap-2">

@@ -3,7 +3,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import LandingPage from "./pages/LandingPage";
+import { runDownload } from "@/components/landing/DownloadButton";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SideNav } from "@/components/layout/SideNav";
 import { SplashScreen } from "@/components/layout/SplashScreen";
@@ -26,21 +28,31 @@ const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
-  if (!user) return <Navigate to="/auth" replace />;
+  if (!user) return location.pathname === "/" ? <LandingPage /> : <Navigate to="/auth" replace />;
   return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={new URLSearchParams(location.search).get("intent") === "download" ? "/?intent=download" : "/"} replace />;
   return <>{children}</>;
 }
 
 function AppShell() {
   const [commandOpen, setCommandOpen] = useState(false);
   useKeyboardShortcuts({ onCommandPalette: () => setCommandOpen(true) });
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("intent") === "download") {
+      navigate(location.pathname, { replace: true });
+      runDownload();
+    }
+  }, [location.search, location.pathname, navigate]);
 
   return (
     <>

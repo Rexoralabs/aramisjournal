@@ -69,7 +69,7 @@ const ProfilePage = () => {
                 <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" className="font-serif text-lg text-center" />
               </div>
               <div>
-                <label className="text-xs font-ui text-muted-foreground mb-1 block">Email</label>
+                <label className="text-xs font-ui text-muted-foreground mb-1 block">Ultra Account</label>
                 <p className="text-sm text-muted-foreground text-center py-2">{user?.email}</p>
               </div>
               <div>

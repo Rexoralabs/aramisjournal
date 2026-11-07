@@ -4,6 +4,7 @@ import { Icon } from "@iconify/react";
 import { format } from "date-fns";
 import gsap from "gsap";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { JournalEditor } from "@/components/journal/JournalEditor";
 import {
   useJournalEntries,
   useJournalEntry,
@@ -34,7 +35,9 @@ const WritePage = () => {
   const [isSummarizing, setIsSummarizing] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const loadedEntryIdRef = useRef<string | null>(null);
+  const savingRef = useRef(false);
+  const [draftKey, setDraftKey] = useState(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const summaryTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const lastSavedContentRef = useRef("");
@@ -62,7 +65,8 @@ const WritePage = () => {
 
   // Load entry data
   useEffect(() => {
-    if (selectedEntry) {
+    if (selectedEntry && selectedEntry.id !== loadedEntryIdRef.current) {
+      loadedEntryIdRef.current = selectedEntry.id;
       setTitle(selectedEntry.title || "");
       setContent(selectedEntry.content);
       setAiSummary((selectedEntry as any).ai_summary || "");
@@ -70,7 +74,8 @@ const WritePage = () => {
       lastSavedTitleRef.current = selectedEntry.title || "";
       isNewEntryRef.current = false;
       setSaveStatus("saved");
-    } else if (todayEntry && !selectedEntryId && !isNewEntryRef.current) {
+    } else if (todayEntry && !selectedEntryId && !isNewEntryRef.current && todayEntry.id !== loadedEntryIdRef.current) {
+      loadedEntryIdRef.current = todayEntry.id;
       setTitle(todayEntry.title || "");
       setContent(todayEntry.content);
       setAiSummary((todayEntry as any).ai_summary || "");
@@ -82,9 +87,11 @@ const WritePage = () => {
 
   // Auto-save
   const autoSave = useCallback(async (currentTitle: string, currentContent: string) => {
+    if (savingRef.current) return;
     if (!currentContent.trim()) return;
     if (currentContent === lastSavedContentRef.current && currentTitle === lastSavedTitleRef.current) return;
 
+    savingRef.current = true;
     setSaveStatus("saving");
     try {
       if (isEditing && selectedEntry) {
@@ -96,6 +103,7 @@ const WritePage = () => {
       } else {
         const result = await createEntry.mutateAsync({ title: currentTitle || undefined, content: currentContent });
         createdEntryIdRef.current = result.id;
+        loadedEntryIdRef.current = result.id;
         isNewEntryRef.current = false;
         try { await updateStreak.mutateAsync(); } catch {}
       }
@@ -104,17 +112,20 @@ const WritePage = () => {
       setSaveStatus("saved");
     } catch {
       setSaveStatus("idle");
+    } finally {
+      savingRef.current = false;
     }
   }, [isEditing, selectedEntry, todayEntry, createEntry, updateEntry, updateStreak]);
 
   useEffect(() => {
     if (!content.trim()) return;
     if (content === lastSavedContentRef.current && title === lastSavedTitleRef.current) return;
+    if (savingRef.current) return;
     setSaveStatus("idle");
     clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => autoSave(title, content), 1500);
     return () => clearTimeout(saveTimerRef.current);
-  }, [content, title, autoSave]);
+  }, [content, title, autoSave, saveStatus]);
 
   // AI Summary auto-save
   useEffect(() => {
@@ -128,6 +139,7 @@ const WritePage = () => {
   }, [aiSummary]);
 
   const handleSelectEntry = (entryId: string | null) => {
+    loadedEntryIdRef.current = null;
     createdEntryIdRef.current = null;
     isNewEntryRef.current = false;
     if (entryId) {
@@ -150,6 +162,8 @@ const WritePage = () => {
   };
 
   const handleNewEntry = () => {
+    loadedEntryIdRef.current = null;
+    setDraftKey(key => key + 1);
     setSearchParams({});
     setTitle("");
     setContent("");
@@ -160,28 +174,6 @@ const WritePage = () => {
     setSaveStatus("idle");
     setAiSummary("");
     setSidebarOpen(false);
-  };
-
-  // Formatting helpers
-  const wrapSelection = (prefix: string, suffix: string) => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const sel = content.substring(start, end);
-    const newContent = content.substring(0, start) + prefix + sel + suffix + content.substring(end);
-    setContent(newContent);
-    setTimeout(() => { ta.focus(); ta.setSelectionRange(start + prefix.length, start + prefix.length + sel.length); }, 0);
-  };
-
-  const prependLine = (prefix: string) => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const pos = ta.selectionStart;
-    const lineStart = content.lastIndexOf("\n", pos - 1) + 1;
-    const newContent = content.substring(0, lineStart) + prefix + content.substring(lineStart);
-    setContent(newContent);
-    setTimeout(() => { ta.focus(); ta.setSelectionRange(pos + prefix.length, pos + prefix.length); }, 0);
   };
 
   // AI Summary
@@ -278,33 +270,10 @@ const WritePage = () => {
             </div>
           </div>
 
-          {/* Formatting Toolbar */}
-          <div className="flex items-center gap-1 px-1">
-            <button onClick={() => wrapSelection("**", "**")} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Bold">
-              <Icon icon="ph:text-b-bold" className="h-4 w-4" />
-            </button>
-            <button onClick={() => wrapSelection("*", "*")} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Italic">
-              <Icon icon="ph:text-italic" className="h-4 w-4" />
-            </button>
-            <button onClick={() => prependLine("## ")} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Heading">
-              <Icon icon="ph:text-h" className="h-4 w-4" />
-            </button>
-            <button onClick={() => prependLine("- ")} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="List">
-              <Icon icon="ph:list-bullets" className="h-4 w-4" />
-            </button>
-            <button onClick={() => prependLine("> ")} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Quote">
-              <Icon icon="ph:quotes" className="h-4 w-4" />
-            </button>
-          </div>
-
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)"
-            className="w-full bg-transparent font-serif text-2xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none" />
-
-          <div className="min-h-[50vh]">
-            <textarea ref={textareaRef} value={content} onChange={(e) => setContent(e.target.value)}
-              placeholder="Start writing your thoughts..."
-              className="w-full min-h-[50vh] resize-none bg-transparent text-foreground leading-relaxed placeholder:text-muted-foreground/50 focus:outline-none" autoFocus />
-          </div>
+          <JournalEditor key={`${selectedEntryId || "today"}-${draftKey}`} content={content} onChange={setContent}
+            documentKey={`${selectedEntryId || "today"}-${draftKey}`}
+            titleField={<input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)"
+              className="w-full bg-transparent font-serif text-2xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none" />} />
 
           <div className="flex items-center justify-between">
             <p className="text-xs font-ui text-muted-foreground">{content.split(/\s+/).filter(Boolean).length} words</p>

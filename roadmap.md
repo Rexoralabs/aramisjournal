@@ -5,3 +5,5 @@
 - [x] Formalize existing design tokens and shared control variants without redesigning.
 - [x] Document typography, layout, surfaces, motion, and change rules.
 - [x] Add a design-drift check and verify existing appearance.
+- [x] Repair Compose formatting with an inline editor while preserving saved entries and the established design.
+- [x] Verify formatting, undo, typing and saved-entry reopening.

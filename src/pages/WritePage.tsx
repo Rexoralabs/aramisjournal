@@ -270,11 +270,10 @@ const WritePage = () => {
             </div>
           </div>
 
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)"
-            className="w-full bg-transparent font-serif text-2xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none" />
-
           <JournalEditor content={content} onChange={setContent}
-            documentKey={`${selectedEntryId || "today"}-${draftKey}`} />
+            documentKey={`${selectedEntryId || "today"}-${draftKey}`}
+            titleField={<input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)"
+              className="w-full bg-transparent font-serif text-2xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none" />} />
 
           <div className="flex items-center justify-between">
             <p className="text-xs font-ui text-muted-foreground">{content.split(/\s+/).filter(Boolean).length} words</p>

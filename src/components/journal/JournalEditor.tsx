@@ -10,9 +10,10 @@ interface JournalEditorProps {
   content: string;
   onChange: (content: string) => void;
   documentKey: string;
+  titleField?: React.ReactNode;
 }
 
-export function JournalEditor({ content, onChange, documentKey }: JournalEditorProps) {
+export function JournalEditor({ content, onChange, documentKey, titleField }: JournalEditorProps) {
   const lastEmitted = useRef(content);
   const editor = useEditor({
     extensions: journalEditorExtensions(),
@@ -77,6 +78,7 @@ export function JournalEditor({ content, onChange, documentKey }: JournalEditorP
           </Tooltip>
         ))}
       </div>
+      {titleField}
       <EditorContent editor={editor} />
     </>
   );

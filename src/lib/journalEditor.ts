@@ -11,6 +11,7 @@ export const journalEditorExtensions = () => [
     code: false,
     codeBlock: false,
     horizontalRule: false,
+    trailingNode: false,
   }),
   Markdown.configure({ markedOptions: { breaks: true, gfm: true } }),
 ];

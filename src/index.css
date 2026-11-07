@@ -399,6 +399,26 @@
   }
 
   /* Markdown rendered content */
+  .journal-editor {
+    min-height: 50vh;
+    overflow-wrap: anywhere;
+  }
+  .journal-editor p { margin: 0; }
+  .journal-editor > * + * { margin-top: 0.5rem; }
+  .journal-editor h2 { @apply text-xl; }
+  .journal-editor strong { @apply font-semibold; }
+  .journal-editor ul { @apply list-disc pl-6; }
+  .journal-editor ol { @apply list-decimal pl-6; }
+  .journal-editor blockquote { @apply border-l-2 border-primary/30 pl-3 italic text-muted-foreground; }
+  .journal-editor p:first-child:last-child:has(> br.ProseMirror-trailingBreak)::before {
+    content: attr(data-placeholder);
+    content: "Start writing your thoughts...";
+    color: hsl(var(--muted-foreground) / 0.5);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+
   .markdown-content strong {
     @apply font-semibold text-foreground;
   }

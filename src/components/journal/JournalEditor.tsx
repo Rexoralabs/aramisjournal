@@ -34,7 +34,7 @@ export function JournalEditor({ content, onChange, documentKey, titleField }: Jo
       lastEmitted.current = markdown;
       onChange(markdown);
     },
-  }, [documentKey]);
+  });
 
   useEffect(() => {
     if (!editor || content === lastEmitted.current) return;

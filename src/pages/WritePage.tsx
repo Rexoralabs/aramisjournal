@@ -270,7 +270,7 @@ const WritePage = () => {
             </div>
           </div>
 
-          <JournalEditor content={content} onChange={setContent}
+          <JournalEditor key={`${selectedEntryId || "today"}-${draftKey}`} content={content} onChange={setContent}
             documentKey={`${selectedEntryId || "today"}-${draftKey}`}
             titleField={<input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)"
               className="w-full bg-transparent font-serif text-2xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none" />} />
